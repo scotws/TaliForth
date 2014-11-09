@@ -3,7 +3,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  07. Nov 2014
+; This version  09. Nov 2014
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -6177,8 +6177,10 @@ z_pploop:       rts             ; never reached
 .scend
 ; ----------------------------------------------------------------------------
 ; PLOOP ( -- ) ("(LOOP)")
-; Runtime routine for loop control. Based on code from FIG Forth. Must be
-; Native Compile. 
+; Runtime routine for loop control. Note we used a fudged index that triggers
+; the loop control when it sets the overflow flag. See (DO) for details.
+; We could share some of this code with +LOOP, but then it wouldn't native
+; compile
 l_ploop:        bra a_ploop
                 .byte NC+CO+$06 
                 .word l_abs     ; link to ABS
@@ -6187,31 +6189,23 @@ l_ploop:        bra a_ploop
                 .byte "(LOOP)"
 .scope
 a_ploop:        ; TOP of the Return Stack has the index. We manipulate the
-                ; 65c02 stack in place
+                ; 65c02 stack in place.
                 stx TMPX
                 tsx
 
-                ; increase loop counter
-                inc $0101,x     ; LSB 
-                bne + 
-                inc $0102,x     ; MBS
+                clc
+                lda $0101,x     ; LSB
+                adc #$01
+                sta $0101,x
 
-                ; compare loop counter with limit 
-*               clc
-                lda $0103,x     ; LSB
-                sbc $0101,x
-                lda $0104,x     ; MSB 
-                sbc $0102,x     
+                clv             ; we check the V flag on MSB
+                lda $0102,x     ; MSB
+                adc #$00        ; we only care about the carry        
+                sta $0102,x
 
-                ; In theory, we could share the following code with +LOOP,
-                ; but then we couldn't native compile
                 ldx TMPX
 
-                ; move sign of A to Carry Flag - in other words, see if 
-                ; result of MSB subtraction is negative. We can't just
-                ; jusr BMI/BPL because the N flag is affected by LDX
-                asl 
-                bcs _hack+3     ; skip over JMP instruction
+                bvs _hack+3     ; skip over JMP instruction
 
 _hack:          ; This is why this routine must be natively compiled: We 
                 ; compile the opcode for JMP here without an address to 
@@ -6268,11 +6262,9 @@ z_j:            rts
 .scend
 ; ----------------------------------------------------------------------------
 ; I ( -- n ) (R: n -- n) 
-; Copy loop counter (top of Return Stack) to stack. Technically this is the
-; same code as R@, but since this will only be executed inside a definition
-; and speed is of the upmost importance in a loop, we make this Native 
-; Compile. Note that this means we cannot call this routine with a 
-; subroutine call, ever.
+; Copy loop counter (top of Return Stack) to stack. Note that this is not the 
+; same as R@ because we use a fudge factor for loop control; see (DO) for more
+; details. Note we make this native compile for speed. 
 l_i:            bra a_i
                 .byte NC+CO+$01 
                 .word l_j    ; link to J
@@ -6282,36 +6274,71 @@ l_i:            bra a_i
 a_i:            dex
                 dex
 
-                pla             ; LSB
-                sta 1,x
-                pla
-                sta 2,x         ; MSB 
+                ; get the fudged index off of the top of the stack. it's
+                ; easier to do math on the stack directly than to pop and
+                ; push stuff around
+                stx TMPX
+                tsx
 
-                pha
-                lda 1,x
-                pha
+                sec
+                lda $0101,x     ; LSB
+                sbc $0103,x
+                sta TMPCNT
 
+                lda $0102,x     ; MSB
+                sbc $0104,x
+
+                ldx TMPX
+
+                sta 2,x         ; MSB of de-fudged index
+                lda TMPCNT
+                sta 1,x         ; LSB of de-fudged index
+                
 z_i:            rts             ; should be never reached, because NC 
 .scend
 ; ----------------------------------------------------------------------------
 ; PDO ( limit start -- ; R: -- limit start ) ("(DO)") 
-; Runtime routine for DO loop. Move the limit and the start parameters of
-; the loop over to the Return Stack. This must be native compile. 
+; Runtime routine for DO loop. Note that ANSI loops quit when the boundry of
+; limit-1 and limit is reached, a different mechanism than the FIG Forth loop 
+; (you can see which version you have by running a loop with start and limit
+; as the same value, for instance 0 0 DO -- these will walk through the 
+; number space). We use a "fudge factor" for the limit that makes the Overflow
+; Flag trip when it is reached; see http://forum.6502.org/viewtopic.php?f=9&t=2026 
+; for further discussion of this. The source given there for this idea is 
+; Laxen & Perry F83. 
+; This routine must be native compile. 
 l_pdo:          bra a_pdo
                 .byte CO+NC+$04 
                 .word l_i    ; link to I
                 .word z_pdo
                 .byte "(DO)"
 .scope
-a_pdo:          lda 4,x         ; start with MSB of limit
-                pha
+a_pdo:          ; first step: create fudge factor (FUFA) by subtracting the limit
+                ; from $8000, the number that will trip the overflow flag
+                sec
+                lda #$00
+                sbc 3,x         ; LSB of limit
+                sta 3,x         ; save FUFA for later use
+                lda #$80
+                sbc 4,x         ; MSB of limit
+                sta 4,x         ; save FUFA for later use
+                pha             ; FUFA replaces limit on R stack
                 lda 3,x         ; LSB of limit
+                pha             
+
+                ; second step: index is FUFA plus original index
+                clc
+                lda 1,x         ; LSB of original index
+                adc 3,x         ; add LSB of FUFA
+                sta 1,x
+                lda 2,x         ; MSB of orginal index
+                adc 4,x         ; add MSB of FUFA
                 pha
-                lda 2,x         ; MSB of start
-                pha
-                lda 1,x         ; LSB of start
+                lda 1,x         ; LSB of index
                 pha
 
+                ; we've saved the FUFA on the NOS of the R stack, so we can
+                ; use it later
                 inx
                 inx
                 inx

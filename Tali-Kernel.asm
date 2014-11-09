@@ -332,7 +332,7 @@ k_wrtchrVIAb:
 ; General OS strings
 ks_welcome: .byte "Booting Kernel for the Überquirrel Mark Zero",0
 ks_author:  .byte "Scot W. Stevenson <scot.stevenson@gmail.com>",0
-ks_version: .byte "Kernel Version Alpha 002 (25. Feb 2014)",0
+ks_version: .byte "Kernel Version Alpha 004 (25. Feb 2014)",0
 
 ; =============================================================================
 ; END
