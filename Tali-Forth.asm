@@ -6247,16 +6247,39 @@ z_leave:        rts
 .scend
 
 ; ----------------------------------------------------------------------------
-; J ( -- )
-; TODO code me
+; J ( -- n ) (R: n -- n)
+; Copy second loop counter from Return Stack to stack. Note we use a fudge
+; factor for loop control; see (DO) for more details. We make this native 
+; compile for speed. 
 l_j:            bra a_j
-                .byte $01 
+                .byte NC+CO+$01 
                 .word l_leave    ; link to LEAVE
                 .word z_j
                 .byte "J"
 
 .scope
-a_j:            nop
+a_j:            dex
+                dex
+
+                ; get the fudged index off from the stack. it's
+                ; easier to do math on the stack directly than to pop and
+                ; push stuff around
+                stx TMPX
+                tsx
+
+                sec
+                lda $0105,x     ; LSB
+                sbc $0107,x
+                sta TMPCNT
+
+                lda $0106,x     ; MSB
+                sbc $0108,x
+
+                ldx TMPX
+
+                sta 2,x         ; MSB of de-fudged index
+                lda TMPCNT
+                sta 1,x         ; LSB of de-fudged index
 
 z_j:            rts
 .scend

@@ -10,8 +10,6 @@ MAJOR KNOWN PROBLEMS
 
 - not all ANSI core instructions coded yet (see TODO.txt). Most notable of these are +LOOP, VALUE, and ?DO
 
-- LOOP has pre-ANSI behavior: Where as 0 0 DO I . LOOP produces nothing in Tali Forth and Fig-Forth, it runs through the whole range of numbers with ANSI Forth.
-
 
 MINOR KNOW PROBLEMS
 

@@ -1,10 +1,11 @@
 Changelog for the Tali Forth 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 19. Jan 2014
-This version:  02. Nov 2014
+This version:  09. Nov 2014
 
 Add changes to top with date. Note major milestones and versions.
 
+09. Nov 2014: LOOP, DO, I and J now confirm to ANSI standard
 02. Nov 2014: Expanded README.txt, CR now newline, adapted to new py65
 16. May 2014: CREATE/DOES> working 
 13. Apr 2014: Basic DO/LOOP works (ALPHA 002) 

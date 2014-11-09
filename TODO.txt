@@ -6,7 +6,7 @@ This version: 02. Nov 2014
 
 List of words that should be coded first:
 
-+LOOP ?DO VALUE WORD 2R> 2>R J LEAVE 
++LOOP ?DO VALUE WORD 2R> 2>R LEAVE 
 
 
 === LONGER TERM ===
