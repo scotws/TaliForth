@@ -1,0 +1,15 @@
+Words to Test the Tali Forth with
+Scot W. Stevenson <scot.stevenson@gmail.com>
+First version 15. March 2014
+This version 18. March 2014
+
+USE THESE FOR PRIMITIVE REGRESSION TESTING
+
+: lat ." <foo>" ;
+: flat ." <bar>" >in dup @ 3 - swap ! ; \ flat prints "<bar><foo>"
+
+char & parse jack& type                 \ should print "jack"    
+
+
+
+
