@@ -1,12 +1,12 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 02. Nov 2014
+This version: 11. Nov 2014
 
 === SHORT TERM === 
 
 List of words that should be coded first:
 
-+LOOP ?DO VALUE WORD 2R> 2>R LEAVE 
+?DO LEAVE VALUE 2R> 2>R WORD
 
 
 === LONGER TERM ===
