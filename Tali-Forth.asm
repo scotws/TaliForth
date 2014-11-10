@@ -6109,63 +6109,19 @@ z_abs:          rts
 .scend
 ; ----------------------------------------------------------------------------
 ; PPLOOP ( n -- ) ("(+LOOP)")
-; Runtime compile for loop control. Based on code from FIG Forth. Must be
-; Native Compile. The step value is TOS in the loop
+; Runtime compile for loop control. Note we use a fudge factor for loop 
+; control so we can test with the Overflow Flag. See (DO) for details.
+; This is Native Compile. The step value is TOS in the loop
 l_pploop:       bra a_pploop
                 .byte NC+CO+$07 
                 .word l_abs     ; link to ABS
                 .word z_pploop
                 .byte "(+LOOP)"
 .scope
-a_pploop:       ; drop counter off the stack before using it so we have 
-                ; the correct value in TMPX at the end
-                inx
-                inx 
-
-                stx TMPX
-
-                ; push loop step to 65c02 stack 
-                lda $00,x       ; MSB 
-                pha             ; not a typo - push MSB twice
-                pha
-                lda $FF,x       ; LSB
-
-                ; TODO HIER HIER 
+a_pploop:       ; TODO HIER HIER 
 
 
-                ; add loop step to counter
-                clc
-                adc $101,x      ; LSB
-                sta $101,x
-                pla             ; pull first MSB
-                adc $102,x      ; MSB
-                sta $102,x
 
-                pla             ; pull second MSB
-                bpl _pos
-
-                ; MSB is negative
-                clc
-                lda $101,x
-                sbc $103,x
-                lda $102,x
-                sbc $104,x
-
-                bra _restore
-
-_pos:           ; compare loop counter with limit 
-                clc
-                lda $103,x     ; LSB
-                sbc $101,x
-                lda $104,x     ; MSB 
-                sbc $102,x     
-
-_restore:       ldx TMPX
-
-                ; move sign of A to Carry Flag - in other words, see if 
-                ; result of MSB subtraction is negative. We can't just
-                ; jusr BMI/BPL because the N flag is affected by LDX
-                asl 
                 bcs _hack+3     ; skip over JMP instruction
 
 _hack:          ; This is why this routine must be natively compiled: We 
@@ -6362,6 +6318,7 @@ a_pdo:          ; first step: create fudge factor (FUFA) by subtracting the limi
 
                 ; we've saved the FUFA on the NOS of the R stack, so we can
                 ; use it later
+
                 inx
                 inx
                 inx
