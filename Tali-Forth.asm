@@ -6149,6 +6149,10 @@ z_pploop:       rts             ; never reached
 ; the loop control when it sets the overflow flag. See (DO) for details.
 ; We could share some of this code with +LOOP, but then it wouldn't native
 ; compile
+; TODO see if we can combine this with (+LOOP) and still have compiling 
+; enabled
+; TODO see if a PHA, TYA version is more efficient as with (+LOOP) because
+; it certainly looks cleaner
 l_ploop:        bra a_ploop
                 .byte NC+CO+$06 
                 .word l_pploop  ; link to PPLOOP 
