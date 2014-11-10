@@ -3,7 +3,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  09. Nov 2014
+; This version  11. Nov 2014
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -6118,11 +6118,23 @@ l_pploop:       bra a_pploop
                 .word z_pploop
                 .byte "(+LOOP)"
 .scope
-a_pploop:       ; TODO HIER HIER 
+a_pploop:       clc
+                pla             ; LSB of index
+                adc 1,x         ; LSB of step
+                tay             ; temporary storage of LSB
 
+                clv
+                pla             ; MSB of index
+                adc 2,x         ; MSB of step
+                pha             ; put MSB of index back on stack
 
+                tya             ; put LSB of index back on stack
+                pha
 
-                bcs _hack+3     ; skip over JMP instruction
+                inx             ; dump step from TOS 
+                inx
+
+                bvs _hack+3     ; skip over JMP instruction
 
 _hack:          ; This is why this routine must be natively compiled: We 
                 ; compile the opcode for JMP here without an address to 
@@ -6139,8 +6151,7 @@ z_pploop:       rts             ; never reached
 ; compile
 l_ploop:        bra a_ploop
                 .byte NC+CO+$06 
-                .word l_abs     ; link to ABS
-;               .word l_pploop    ; link to PPLOOP # TODO change
+                .word l_pploop  ; link to PPLOOP 
                 .word z_ploop
                 .byte "(LOOP)"
 .scope
@@ -7159,7 +7170,7 @@ z_words:        rts
 ; of the file and have EVALUATE run through them
 fhltbl:
         .word fh_if, fh_then, fh_else, fh_until, fh_while, fh_rpt
-        .word fh_do, fh_loop ; fh_ploop
+        .word fh_do, fh_loop, fh_ploop
         .word $0000
 
 ; All high-level command strings are uppercase and start with fh_ . Note 
@@ -7191,8 +7202,8 @@ fh_do:
 .byte 48, ": DO POSTPONE (DO) HERE ; IMMEDIATE COMPILE-ONLY"
 fh_loop:
 .byte 65, ": LOOP POSTPONE (LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
-; fh_ploop:
-; .byte 67, ": +LOOP POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
+fh_ploop:
+.byte 67, ": +LOOP POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
 ; len -->  0    0   1    1    2    2    3    3    4    4    5    5    6    6    7
 ;          0    5   0    5    0    5    0    5    0    5    0    5    0    5    0
 
