@@ -3,7 +3,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  11. Nov 2014
+; This version  12. Nov 2014
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -6109,7 +6109,8 @@ z_abs:          rts
 .scend
 ; ----------------------------------------------------------------------------
 ; PPLOOP ( n -- ) ("(+LOOP)")
-; Runtime compile for loop control. Note we use a fudge factor for loop 
+; Runtime compile for loop control. This is used for both +LOOP and LOOP which
+; are defined at high level. Note we use a fudge factor for loop 
 ; control so we can test with the Overflow Flag. See (DO) for details.
 ; This is Native Compile. The step value is TOS in the loop
 l_pploop:       bra a_pploop
@@ -6144,53 +6145,11 @@ _hack:          ; This is why this routine must be natively compiled: We
 z_pploop:       rts             ; never reached
 .scend
 ; ----------------------------------------------------------------------------
-; PLOOP ( -- ) ("(LOOP)")
-; Runtime routine for loop control. Note we used a fudged index that triggers
-; the loop control when it sets the overflow flag. See (DO) for details.
-; We could share some of this code with +LOOP, but then it wouldn't native
-; compile
-; TODO see if we can combine this with (+LOOP) and still have compiling 
-; enabled
-; TODO see if a PHA, TYA version is more efficient as with (+LOOP) because
-; it certainly looks cleaner
-l_ploop:        bra a_ploop
-                .byte NC+CO+$06 
-                .word l_pploop  ; link to PPLOOP 
-                .word z_ploop
-                .byte "(LOOP)"
-.scope
-a_ploop:        ; TOP of the Return Stack has the index. We manipulate the
-                ; 65c02 stack in place.
-                stx TMPX
-                tsx
-
-                clc
-                lda $0101,x     ; LSB
-                adc #$01
-                sta $0101,x
-
-                clv             ; we check the V flag on MSB
-                lda $0102,x     ; MSB
-                adc #$00        ; we only care about the carry        
-                sta $0102,x
-
-                ldx TMPX
-
-                bvs _hack+3     ; skip over JMP instruction
-
-_hack:          ; This is why this routine must be natively compiled: We 
-                ; compile the opcode for JMP here without an address to 
-                ; go to, which is added by the next address by LOOP. 
-                .byte $4C 
-
-z_ploop:        rts             ; never reached 
-.scend
-; ----------------------------------------------------------------------------
 ; UNLOOP ( -- ; R: n1 n2 -- ) 
 ; Drop loop control stuff from Return Stack 
 l_unloop:       bra a_unloop
                 .byte NC+CO+$06 
-                .word l_ploop    ; link to PLOOP
+                .word l_pploop  ; link to PPLOOP 
                 .word z_unloop
                 .byte "UNLOOP"
 .scope
@@ -7205,7 +7164,7 @@ fh_rpt:
 fh_do:
 .byte 48, ": DO POSTPONE (DO) HERE ; IMMEDIATE COMPILE-ONLY"
 fh_loop:
-.byte 65, ": LOOP POSTPONE (LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
+.byte 77, ": LOOP POSTPONE 1 POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
 fh_ploop:
 .byte 67, ": +LOOP POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
 ; len -->  0    0   1    1    2    2    3    3    4    4    5    5    6    6    7
@@ -7227,7 +7186,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version ALPHA 004 (07. Nov 2014)",0
+fs_version:    .byte "Version ALPHA 004 (12. Nov 2014)",0
 fs_disclaim:   .byte "Tali Forth comes with absolutely no warranty",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0
