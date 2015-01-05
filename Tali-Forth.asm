@@ -3,7 +3,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  12. Nov 2014
+; This version  15. Nov 2014
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 

@@ -38,13 +38,13 @@ Tali Forth aims to be, in rough order of priority:
 
 IMPLEMENTATION NOTES (ALPHA 001) 
 
-Important core words are still missing, including DOES> and MOVE. Other parts have barely been tested. Forth words that are depreciated such as WORD will be implemented last (if at all). None of the Block vocabulary is yet implemented. 
+Important core words are still missing. Other parts have barely been tested. Forth words that are depreciated such as WORD will be implemented last (if at all). None of the Block vocabulary is yet implemented. 
 
 Tali Forth uses subroutine threading for longer words but automatically compiles shorter routines in native 65c02 code. In the current version, the decision which words are compiled how is on an ad-hoc basis; in future, this will follow a rule based on speed and size of the routine. 
 
 As a very simple implementation, Tali Forth does not support multitasking and is not thread safe in any sense of the word. There are no individual USER variables. Interrupts are currently not implemented in the kernel or Forth code. 
 
-The "functional" reference is gForth (http://www.gnu.org/software/gforth/). Code that works on Tali Forth should produce the same result in gForth or have a good reason why it is different. 
+The "functional" reference is gforth (http://www.gnu.org/software/gforth/). Code that works on Tali Forth should produce the same result in gForth or have a good reason why it is different. 
 
 
 
