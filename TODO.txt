@@ -1,17 +1,29 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 18. Nov 2014
+This version: 07. Jan 2015
 
 === SHORT TERM === 
 
 List of words that should be coded first:
 
-?DO LEAVE VALUE 2R> 2>R DEFER IS WORD
-
+PICK
+?DO 
+ABORT" 
+LEAVE 
+VALUE TO
+2R> 
+2>R 
+DEFER IS DEFER! DEFER@ ACTION-OF
+MS
+TIME&DATE (req hardware support)
+WORD
+NEXTNAME (not ANSI, from gforth) 
 
 === LONGER TERM ===
 
 - include interrupts in kernel
 - cut kernel further down to size
 - remove .invokes, edit MACRO file 
+- simplify high-level word definitions
+- check code for use of BIT 
 
