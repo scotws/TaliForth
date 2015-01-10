@@ -2765,7 +2765,6 @@ _done:          inx             ; 2DROP
                 
 z_plstore:      rts
 .scend
-
 ; ----------------------------------------------------------------------------
 ; CONSTANT ( n -- )
 ; Could be realized as  CREATE , DOES> @ . We do more in assembler, but let
@@ -2804,14 +2803,54 @@ a_constant:     ; we let CREATE and , (COMMA) do the heavy lifting
 
 z_constant:     rts
 .scend
+; ----------------------------------------------------------------------------
+; VALUE ( n -- )
+; VALUE is basically the same as CONSTANT, though we can change a VALUE 
+; and not a constant. The difference is that TO replaces the number in-place
+; in the dictionary, whereas a second CONSTANT adds a new dictionary entry.
+l_value:        bra a_value
+                .byte $05 
+                .word l_constant    ; link to CONSTANT
+                .word z_value
+                .byte "VALUE"
 
+.scope
+a_value:        bra l_constant      ;JSR/RTS, use branch to save a byte
+z_value:        
+.scend
+
+; ----------------------------------------------------------------------------
+; TO ( n "name" -- ) 
+; Change the value of a VALUE. Note that in theory this would work with
+; CONSTANT as well, but we frown on this behavior. Also note that while 
+; Gforth lets you chage the value of a VALUE with >BODY +! (in violation
+; of ANSI), we do not.  
+l_to:           bra a_to
+                .byte $02 
+                .word l_value   ; link to VALUE
+                .word z_to
+                .byte "TO"
+
+.scope
+a_to:           jsr l_tick      ; ' (TICK)
+                jsr l_gtbody    ; >BODY
+                dex             ; VALUE payload starts three bytes
+                dex             ; below >BODY begin 
+                lda #$03                
+                sta 1,x         ; LSB 
+                stz 2,x
+                jsr l_plus 
+                jsr l_store     
+
+z_to:           rts
+.scend
 ; ----------------------------------------------------------------------------
 ; 2VARIABLE ( "name" -- )
 ; Basically this boils down to CREATE 2 CELLS ALLOT a tiny bit quicker
 ; An alternate Forth definition is CREATE 0 , 0 ,
 l_2var:         bra a_2var
                 .byte $09
-                .word l_constant    ; link to CONSTANT
+                .word l_to    ; link to TO
                 .word z_2var
                 .byte "2VARIABLE"
 .scope
@@ -3736,6 +3775,8 @@ z_gtname:       rts
 ; Return Data Field address that corresponds to the execution token given. 
 ; In our case, we return the address that is marked in the source code 
 ; with "a_", that is, the beginning of the Data Field. 
+; Note that where Gforth lets you use >BODY to access the value of a VALUE 
+; (in violation of ANSI), Tali Forth does not; use TO. 
 l_gtbody:       bra a_gtbody
                 .byte NC+$05 
                 .word l_gtname  ; link to GTNAME (">NAME")
