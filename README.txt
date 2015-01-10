@@ -1,7 +1,7 @@
 README for Tali Forth for the 65c02 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 19. Jan 2014
-This version:  09. Nov 2014
+This version:  10. Jan 2015
 
 
 This is the README.txt version released with Tali Forth ALPHA 004. Note that
@@ -58,7 +58,7 @@ Tali Forth was written with vim and the Ophis 2.1 cross-assembler (http://michae
 
 Switch to the folder where the Tali code lives, and assemble with
 
-        ophis --65c02 Tali-main-A001.asm 
+        ophis --65c02 Tali-main-A004.asm 
 
 
 Development was performed with py65mon (https://github.com/mnaberez/py65) which is also in Python. To install on Linux:

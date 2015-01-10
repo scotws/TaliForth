@@ -3,7 +3,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  15. Nov 2014
+; This version  10. Jan 2015
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -6619,13 +6619,41 @@ a_depth:        ; We've got zero entries when X is $7F
                 stz 2,x         ; always zero 
 
 z_depth:        rts
+; ----------------------------------------------------------------------------
+; PICK ( n n u -- n n n ) 
+; Take the u-th element out of the stack and put it on TOS, overwriting the 
+; current TOS. 0 PICK is equivalent to DUP, 1 PICK to OVER. Note that 
+; using PICK is considered poor coding form.
+; TODO use DEPTH to check for underflow 
+l_pick:         bra a_pick
+                .byte $04 
+                .word l_DEPTH   ; link to DEPTH
+                .word z_pick
+                .byte "PICK"
+
+.scope
+a_pick:         lda 1,x         ; we only recognize the LSB (stack is small)
+                asl 
+                clc
+                adc #$03
+                tay
+                stx TMPADR
+                stz TMPADR+1
+                lda (TMPADR),y  ; MSB
+                sta 1,x
+                iny 
+                lda (TMPADR),y  ; LSB
+                sta 2,x
+
+z_pick:         rts
+.scend
 ; -----------------------------------------------------------------------------
 ; ROT (m n o -- n o m )
 ; Rotate the top three entries downwards
 
 l_rot:          bra a_rot
                 .byte NC+$03 
-                .word l_DEPTH   ; link to DEPTH
+                .word l_pick    ; link to PICK
                 .word z_rot
                 .byte "ROT"
 
@@ -7186,7 +7214,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version ALPHA 004 (12. Nov 2014)",0
+fs_version:    .byte "Version ALPHA 004 (10. Jan 2015)",0
 fs_disclaim:   .byte "Tali Forth comes with absolutely no warranty",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0

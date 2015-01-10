@@ -1,16 +1,15 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 07. Jan 2015
+This version: 10. Jan 2015
 
 === SHORT TERM === 
 
 List of words that should be coded first:
 
-PICK
+VALUE TO
 ?DO 
 ABORT" 
 LEAVE 
-VALUE TO
 2R> 
 2>R 
 DEFER IS DEFER! DEFER@ ACTION-OF
