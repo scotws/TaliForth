@@ -2,7 +2,7 @@
 \ Scot W. Stevenson  <scot.stevenson@gmail.com>
 \ gforth 0.7.2, License GPL (c) Use at your own risk
 \ First version: 07. Feb 2014
-\ This version:  09. Nov 2014
+\ This version:  10. Jan 2015
 
 \ Takes the link name of a word and prints an empty header to the screen
 \ so it can be accessed by copy and paste. From gforth, call
@@ -15,25 +15,21 @@
    
 16 constant INDENT
 
-: soff ( u -- )  \ push in by 'indent' spaces 
-   INDENT spaces ; 
+\ push in by 'indent' spaces 
+: soff ( u -- )   INDENT spaces ; 
 
-: loffset ( u -- u )  \ take length of word and calculate the offset for the links
-   INDENT swap -  
-   3 - 
-   spaces ;       \ for l_ and : stuff
+\ take length of word and calculate the offset for the links
+: loffset ( u -- u )  INDENT swap -   3 -  spaces ;       \ for l_ and : stuff
 
-: dashes ( -- )   \ print a line of dashes 
-   76 0 do [char] - emit loop ; 
+\ print a line of dashes 
+: dashes ( -- )   76 0 do [char] - emit loop ; 
 
-: str2upper ( addr u -- ) 
-   0 do  dup i +  c@  toupper  emit loop drop ; 
+: str2upper ( addr u -- )  0 do  dup i +  c@  toupper  emit loop drop ; 
 
-: makeentry   ( "word"  -- )  \ keep (addr n) from PARSE-NAME on top of stack at all times
+\ keep (addr n) from PARSE-NAME on top of stack at all times
+: makeentry   ( "word"  -- )  
    decimal 
-   cr 
-   parse-name     \ puts addr n on the stack 
-   dup >r         \ save length to R 
+   cr parse-name  dup >r
    
    ." ; " dashes cr
    ." ; " 2dup str2upper ."  ( -- )" cr 
