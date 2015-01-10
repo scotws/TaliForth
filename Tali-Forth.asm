@@ -6626,7 +6626,7 @@ z_depth:        rts
 ; using PICK is considered poor coding form.
 ; TODO use DEPTH to check for underflow 
 l_pick:         bra a_pick
-                .byte $04 
+                .byte NC+$04 
                 .word l_DEPTH   ; link to DEPTH
                 .word z_pick
                 .byte "PICK"
