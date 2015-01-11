@@ -6,7 +6,6 @@ This version: 10. Jan 2015
 
 List of words that should be coded first:
 
-VALUE TO
 ?DO 
 ABORT" 
 LEAVE 
@@ -25,4 +24,4 @@ NEXTNAME (not ANSI, from gforth)
 - remove .invokes, edit MACRO file 
 - simplify high-level word definitions
 - check code for use of BIT 
-
+- See if S" conforms to Gforth usage

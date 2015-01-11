@@ -5,7 +5,7 @@ This version:  10. Jan 2015
 
 Add changes to top with date. Note major milestones and versions.
 
-10. Jan 2015: Added PICK 
+10. Jan 2015: Added PICK, VALUE and TO
 11. Nov 2014: Added ANSI-standard +LOOP
 09. Nov 2014: LOOP, DO, I and J now confirm to ANSI standard
 02. Nov 2014: Expanded README.txt, CR now newline, adapted to new py65
