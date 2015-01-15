@@ -1,0 +1,128 @@
+A Walkthrough of CREATE/DOES> for Tali Forth
+Scot W. Stevenson <scot.stevenson@gmail.com>
+First version: 14. Jan 2015
+This version: 15. Jan 2015
+
+CREATE/DOES> is the most complex, but also most powerful part of Forth. Understanding how it works in Tali Forth is central to being able to modify or adapt the code yourself, should you chose to do so. There is a very good and detailed description of the general processes by Brad Rodriguez at http://www.bradrodriguez.com/papers/moving3.htm you should check before reading this document. Here, we walk through the specific mechanism with a Subroutine Threaded Code (STC) Forth such as Tali Forth on a 6502-type CPU. 
+
+(Link discussion on 6502.org FEHLT)
+
+Take the following standard learning example:
+
+        : CONSTANT CREATE , DOES> @ ; 
+
+We examine this in three phases or "sequences", based on Derick and Baker (see Brad for details):   
+
+
+SEQUENCE I: Compiling the word CONSTANT 
+
+CONSTANT is a "defining words", one that makes new words. In pseudocode, the above compiles to: 
+
+        [Header "CONSTANT"] 
+        jsr CREATE
+        jsr COMMA
+        jsr (DOES>)         ; from DOES>
+   a:   jsr DODOES          ; from DOES>
+   b:   jsr FETCH
+        rts
+
+DOVAR puts the address of the first cell after the header code - the first cell of the Parameter Field Area (PFA) - on the Data Stack. To make things easier to explain later, we've added the labels "a" and "b" in the listing. Note that DOES> is an immediate word that adds two subroutine jumps, one to (DOES>) and one to DODOES, which is a pre-defined system routine like DOVAR. We'll see what it does later.
+
+SEQUENCE II: Executing the word CONSTANT / creating LIFE 
+
+Now, when we execute
+
+        42 CONSTANT LIFE
+
+this pushes the RTS of the calling routine -- call it "main" -- to the 65c02's stack (the Return Stack, as Forth calls it). It now looks something like this:
+
+        [1] RTS to main routine 
+
+Without going into detail, the first three subroutine jumps of CREATE give us this word: 
+
+        [Header "LIFE"]
+        jsr DOVAR               ; in CFA, from LIFE's CREATE
+        4200                    ; in PFA (little-endian)
+
+Next, we JSR to (DOES>). This jump places the RTS address to CONSTANT on 
+the 65c02's stack, the address we had labeled "a". 
+
+        [2] RTS to CONSTANT ("a") 
+        [1] RTS to main routine 
+
+Now the tricks start. (DOES>) takes this address off the stack and uses it to replace the DOVAR JSR target in the CFA of our freshly created LIFE word. We now have this: 
+
+        [Header "LIFE"]         
+        jsr a                   ; in CFA, modified by (DOES>)
+   c:   4200                    ; in PFA (little-endian)
+
+Note we added a label "c". Now when (DOES>) reaches its own RTS, it finds the RTS to the main routine on its stack. This is Good Thing (TM), because it aborts the execution of the rest of CONSTANT, and we don't want to do DODOES or FETCH now. We're back at the main routine. 
+
+
+SEQUENCE III: Executing LIFE
+
+So now we have whatever main program we're running, and execute LIFE.
+
+        jsr LIFE
+
+The first thing this call does is push the RTS to the main routine on the 65c02's stack: 
+
+        [1] RTS to main
+
+The CFA of LIFE executes a JSR to label a in CONSTANT. This pushes the RTS of LIFE on the 65c02' stack:
+
+        [2] RTS to LIFE ("c")
+        [1] RTS to main
+
+This JSR to a lands us at the JSR to DODOES, so the return address to CONSTANT gets pushed on the stack as well. We had given this the label "b". After this, we have three addresses on the 65c02's stack: 
+
+        [3] RTS to CONSTANT ("b") 
+        [2] RTS to LIFE ("c") 
+        [1] RTS to main
+
+DODOES pops address b off the 65c02's stack and puts it in a nice safe place in Zero Page, which we'll call "z". More on that in a moment. First, DODOES pops the RTS to LIFE. This in fact is "c", the address of the PFA or LIFE, where we stored the payload of this constant. Basically, DODOES performs a DOVAR here, and pushes "c" on the Data Stack. Now all we have left on the 65c02's stack is the RTS to the main routine.  
+
+        [1] RTS to main
+
+This is where "z" comes in, the location in Zero Page where we stored address "b" of CONSTANT. Remember, this is where CONSTANT's own PFA begins, the FETCH command we had originally codes after DOES> in the very first definition. The really clever part: We perform an indirect JMP -- not a JSR! -- to this address.
+
+        jmp (z) 
+
+Now CONSTANT's little programm is executed, the subroutine jump to FETCH. Since we just put the PFA ("c") on the Data Stack, FETCH replaces this by 42, which is what we were aiming for all along. Since CONSTANT ends with a RTS, we pull the last remaining address off the 65c02's stack, which is the return address to the main routine where we started. 
+
+
+Put together, this is what we have to code: 
+
+DOES>: Compiles a subroutine jump to (DOES>), compiles a subroutine jump 
+to DODOES.
+
+(DOES>): Pops the stack (address of subroutine jump to DODOES in CONSTANT), 
+increase this by one, replace the original DOVAR jump target in LIFE. 
+
+DODOES: Pop stack (CONSTANT's PFA), increase address by one, store on Zero Page; pop stack (LIFE's PFA), increase by one, store on Data Stack; JMP to address we stored in Zero Page. 
+
+Remember we have to increase the address by one because of the way JSR stores the return address for RTS on the stack on the 65c02: It points to the third byte of the JSR instruction itself, not the actual return address.
+
+
+
+
+In Tali Forth, the XT of a word is a pointer to the CFA, and >BODY gives us the PFA by assuming that it will always be three bytes (one JSR instruction) below the CFA. Remember that >BODY is only to be used with words that were compiled by CREATE -- using it on anything else will result in unpredictable behavior, probably crashing the machine. 
+
+(For example, >BODY is used for the ANS reference definitions of DEFER and friends: 
+
+        : DEFER ( "name" -- )   CREATE ['] ABORT , DOES> @ EXECUTE ; 
+        : DEFER@ ( xt1 -- xt2 )  >BODY @ ;  
+        : DEFER! ( xt2 xt1 -- ) >BODY ! ; 
+        : IS ( xt "name" -- )   ' >BODY ! ; 
+
+These all assume that >BODY points to a single cell that contains an XT, not a JSR instruction.) 
+
+With most words in Tali Forth, the distinction between PFA and CFA is meaningless or at least blurred, because we go native anyway. It is only CREATE/DOES> words where this makes sense.
+
+
+
+
+
+
+
+

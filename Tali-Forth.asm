@@ -3,7 +3,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  10. Jan 2015
+; This version  15. Jan 2015
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -78,7 +78,7 @@
 
 .alias DP       $90   ; Dictionary Pointer (last entry; 2 bytes)
 .alias CP       $92   ; Compiler Pointer (next free RAM byte; 2 bytes)
-.alias CREATE   $94   ; CREATE flag for variable/word creation ($00/$FF)
+;               $94   ; UNUSED
 .alias STATE    $95   ; Compile state flag, TRUE is compile (2 bytes)
 .alias BASE     $97   ; Number base, default decimal ($0A) (1 byte) 
 .alias CIBA     $98   ; Address of the Current Input Buffer (CIB) (2 bytes)
@@ -165,9 +165,6 @@ COLD:   ; Load default values to registers and pointers
         ; ... and declare that buffer to be empty
         stz CIBN
         stz CIBN+1
-
-        ; CREATE starts out in the default mode (variable)
-        stz CREATE
 
         ; Reset stack pointer
         ldx #SP0        
@@ -679,7 +676,9 @@ fc_docon:       ; value is stored in the two bytes after the JSR
                 dex
                 dex
 
-                ldy #$01                ; not zero
+                ; start LDY off with one instead of zero because of how JSR
+                ; stores the address for RTS
+                ldy #$01
                 lda (TMPADR2),y         ; LSB 
                 sta 1,x
                 iny
@@ -687,7 +686,7 @@ fc_docon:       ; value is stored in the two bytes after the JSR
                 sta 2,x
 
                 ; the RTS takes us back to the original caller 
-z_docon:        rts
+                rts
 .scend
 ; -----------------------------------------------------------------------------
 ; DOVAR Execute a variable: Push the address of the first bytes of the 
@@ -701,7 +700,8 @@ fc_dovar:       ; pull return address off of the machine's stack
                 pla             ; MSB of return address
                 sta TMPADR2+1
 
-                ; The address is one byte below this 
+                ; On the 65c02, the address for RTS is actually the third
+                ; byte of the JSR command, so we add one byte
                 inc TMPADR2
                 bne +
                 inc TMPADR2+1
@@ -709,12 +709,50 @@ fc_dovar:       ; pull return address off of the machine's stack
                 ; get variable and push it on the stack 
 *               dex
                 dex
+
                 lda TMPADR2     ; LSB
                 sta 1,x
                 lda TMPADR2+1   ; MSB
                 sta 2,x
 
-z_dovar:        rts
+                rts
+.scend
+; -----------------------------------------------------------------------------
+; DODOES Runtime part for DOES>, installed by DOES> and used in combination 
+; with (DOES). See http://www.bradrodriguez.com/papers/moving3.htm
+; for details on how this works.
+.scope
+fc_dodoes:      ; Assumes the address of the CFA of the original defining word
+                ; is on the top of the stack (for instance, CONSTANT). Save 
+                ; it for a jump later. We have to add one byte because of the
+                ; way that JSR stores the return address for RTS
+                pla
+                sta TMPADR2
+                pla
+                sta TMPADR2+1 
+
+                inc TMPADR2
+                bne +
+                inc TMPADR2+1
+
+                ; Next on the stack should be the address of the PFA of 
+                ; the calling defined word, say the name of the constant
+                ; we just defined. Push this on the Data Stack.
+*               dex
+                dex
+
+                pla 
+                clc 
+                adc #$01        ; add one because of JSR convention
+                sta 1,x
+                pla
+                adc #$00        ; we only care about the carry
+                sta 2,x
+
+                ; Left on the stack is the return address from the original
+                ; "main" routine. We leave that untouched, and JMP to the
+                ; code fragment of the defining word
+                jmp (TMPADR2) 
 .scend
 ; =============================================================================
 ; ERROR ROUTINE
@@ -2777,8 +2815,7 @@ l_constant:     bra a_constant
                 .word z_constant
                 .byte "CONSTANT"
 .scope
-a_constant:     ; we let CREATE and , (COMMA) do the heavy lifting
-                stz CREATE              ; we use a generic create
+a_constant:     ; we let CREATE and do the heavy lifting
                 jsr l_create
 
                 ; CREATE gives us the subroutine jump to DOVAR, but we want
@@ -2857,7 +2894,6 @@ l_2var:         bra a_2var
 a_2var:         ; We let CREATE and ALLOT do the heavy lifting, because both
                 ; are a bit too large for native coding. CREATE sets the 
                 ; two following bytes to zero
-                stz CREATE      ; we want a generic create
                 jsr l_create
 
                 dex             ; Push 2 on stack
@@ -2883,7 +2919,6 @@ l_var:          bra a_var
 a_var:          ; We let CREATE and ALLOT do the heavy lifting, because both
                 ; are a bit too large for native coding. CREATE sets the 
                 ; two following bytes to zero
-                stz CREATE      ; we want a generic create
                 jsr l_create
 
                 dex             ; Push 2 on stack
@@ -2899,8 +2934,7 @@ z_var:          rts
 ; PDOES ( -- addr ) ("(DOES>)")
 ; Compiled part of DOES>. This may not be natively compiled 
 ; See http://www.bradrodriguez.com/papers/moving3.htm for a discussion of 
-; DOES> internal workings . Note we push the address of the Data Field 
-; of the instance created to the stack in this routine, not in DOES>
+; DOES> internal workings and the file create-does.txt for a walkthrough. 
 l_pdoes:        bra a_pdoes
                 .byte CO+$07 
                 .word l_var     ; link to VARIABLE
@@ -2909,89 +2943,67 @@ l_pdoes:        bra a_pdoes
 
 .scope
 a_pdoes:        ; Get the address of the machine code that follows 
-                ; this instruction, which is the beginning of the payload
-                ; code defined by DOES>
+                ; this instruction, which is always a subroutine jump to 
+                ; DODOES 
                 pla
                 sta TMPADR
                 pla
                 sta TMPADR+1
 
-                ; Now increase it by one because of the way the JSR works
+                ; Increase it by one because of the way the JSR works
                 inc TMPADR
                 bne +
                 inc TMPADR+1
 
-*               ; Since we're following CREATE which creates a jump to
-                ; the DOVAR routine by default, we have to replace that address
-                ; for the jump with what we just got off the stack. 
-
-                ; CREATE has already grabbed the Dictionary Pointer (DP) so 
-                ; we can use that as the base. We can't just use the CP like
-                ; CONSTANT does because we don't know what all follows
-                ; the CREATE command. 
-                lda DP
+                ; CREATE automatically added a subroutine jump to DOVAR 
+                ; to our new word. We need to replace it with a jump to 
+                ; the address we just prepared in TMPADR. CREATE 
+                ; has already modified the Dictionary Pointer (DP) so we can 
+                ; use that as the base -- we can't just use the CP like
+                ; CONSTANT because we don't know which instructions all 
+                ; followed the CREATE command. 
+*               lda DP
                 sta TMPADR2
                 lda DP+1
                 sta TMPADR2+1
 
-                ; Now we add the offset byte usually used by the BRA command.
-                ; This gives us a_xxxx
+                ; Walking through the header, we get the offset that BRA uses
+                ; for the jump to a_xxxx. Because of the way BRA works, we add 
+                ; two further bytes, and another byte because we skip the
+                ; JSR command
                 ldy #$01
                 lda (DP),y
+                clc 
+                adc #$03        ; faster by two 2 cycles that 3 * INC 
 
-                ; We need to start two bytes farther down because of the way 
-                ; BRA works. Note we also replace the JSR opcode by a JMP so
-                ; we don't get into trouble with the return call. We can get 
-                ; away with INC because the offset from the BRA instruction 
-                ; can never even come close to $FF
-                inc
-                inc
-
-                clc
+                ; now we add this to the new address. Note we don't have to 
+                ; clear carry again because the last operation can never 
+                ; come close to an overflow -- a byte saved is a byte earned!
                 adc TMPADR2
                 sta TMPADR2
                 bcc +
                 inc TMPADR2+1
 
-*               ; Now we store the address of the instruction after 
+                ; Now we store the address of the instruction after 
                 ; JSR (DOES>) at the beginning of the data field
-                ldy #$00
- 
-                lda #$4C                ; opcode for JMP
-                sta (TMPADR2),y
-                iny
+*               ldy #$00
                 lda TMPADR
                 sta (TMPADR2),y
                 iny
                 lda TMPADR+1
                 sta (TMPADR2),y
 
-                ; Finally, we push the address of the first byte of the
-                ; Data Field on the stack so commands like @ (FETCH) will
-                ; even work. 
-                dex
-                dex
-
-                clc
-                lda TMPADR2
-                adc #$03
-                sta 1,x                 ; LSB
-                bcc +
-                inc TMPADR2+1
-*               lda TMPADR2+1
-                sta 2,x                 ; MSB
-
                 ; Done. Since we've removed the actual return address off 
                 ; the 65c02 stack, we don't smash into the code that is
-                ; actually reserved for the word we've just created.
-
+                ; actually reserved for the word we've just created, but 
+                ; go back to whatever the main routine was.
 z_pdoes:        rts
 .scend
 ; ----------------------------------------------------------------------------
 ; DOES>  ( -- )
 ; Create the payload for defining our own defining words. 
 ; See http://www.bradrodriguez.com/papers/moving3.htm for a discussion of 
-; DOES> internal workings
+; DOES> internal workings. This may not be native compile
 l_does:         bra a_does
                 .byte CO+IM+$05 
                 .word l_pdoes    ; link to PDOES
@@ -3007,6 +3019,18 @@ a_does:         ; compile a subroutine jump to (DOES>)
                 sta (CP),y
                 iny
                 lda #>l_pdoes   ; MSB of (DOES>)
+                sta (CP),y
+                iny
+
+                ; compile a subroutine jump to DODOES. This is the 
+                ; CFA of the new word
+                lda #$20        ; opcode for JSR
+                sta (CP),y
+                iny
+                lda #<fc_dodoes ; LSB of DODOES
+                sta (CP),y
+                iny
+                lda #>fc_dodoes ; MSB of DODOES
                 sta (CP),y
                 iny
 
@@ -3042,8 +3066,8 @@ a_create:       ; see if we were given a name. Ideally, this returns
                 ora 2,x         ; MSB
                 bne +
 
-                ; CREATE never returns anything, so we clean up by dropping
-                ; (addr n) from PARSE-NAME 
+                ; Clean up the stack before we return; drops ( addr u ) from
+                ; PARSE-NAME 
                 inx
                 inx
                 inx
@@ -3052,8 +3076,8 @@ a_create:       ; see if we were given a name. Ideally, this returns
                 lda #$0a        ; Code for name not found during parsing
                 jmp error 
 
-*               ; convert name to upper case 
-                jsr f_strtoupper
+                ; found word, convert name to upper case 
+*               jsr f_strtoupper
 
                 ; remember the first free byte of memory. TMPADR now 
                 ; contains the first byte of the new directory entry
@@ -3076,13 +3100,12 @@ a_create:       ; see if we were given a name. Ideally, this returns
                 adc #$07
                 sta TMPCNT+1    ; save length of header 
 
-                ; reserve the bytes we'll need for the header. Note that 
-                ; create doesn't reserve any space for the varliable itself
-                ; This overwrites the length of the name string 
+                ; reserve the bytes we'll need for the header. This overwrites 
+                ; the length of the name string on the stack
                 sta 1,x         ; LSB
                 stz 2,x         ; MSB is ignored, we're never that long
 
-                jsr l_allot     ; ALLOT removes top entry of stack
+                jsr l_allot     ; removes top entry of stack
 
                 ; Now we just walk through the new header, filling it 
                 ; byte by byte, using Y as the offset
@@ -3092,7 +3115,10 @@ a_create:       ; see if we were given a name. Ideally, this returns
                 lda #$80
                 sta (TMPADR),y
 
-                ; Byte 2 / offset 1: Offset to beginning of Data Field
+                ; Byte 2 / offset 1: Offset to the Code Field Address 
+                ; (CFA), which we execute when this word is called. Note
+                ; that for most words, the classical difference between 
+                ; CFA and Parameter Field Address (PFA) is non-existant.
                 iny 
                 lda #$04        ; a BRA offset of 0 points to next byte
                 adc TMPCNT      ; length of name string 
@@ -3103,7 +3129,7 @@ a_create:       ; see if we were given a name. Ideally, this returns
                 lda TMPCNT      ; length of name string
                 sta (TMPADR),y
 
-                ; Byte 4+5 / offset 3+4 : Link Field
+                ; Byte 4+5 / offset 3+4 : Link Field 
                 iny 
                 lda DP          ; LSB
                 sta (TMPADR),y
@@ -3133,7 +3159,7 @@ a_create:       ; see if we were given a name. Ideally, this returns
                 ; on the top of the stack. Subtract six so we can use Y for 
                 ; both strings 
                 iny 
-                clc 
+                clc             ; not: SEC
                 lda 1,x
                 sbc #$06
                 sta TMPADR1
@@ -3147,14 +3173,6 @@ _loop:          ; copy name string to dictionary entry
                 iny
                 dec TMPCNT
                 bne _loop
-
-                ; This is where header creation for a VARIABLE and for a
-                ; word through COLON part ways. We only continue if this
-                ; is for variables. Note that DP is still pointed to the 
-                ; old last dictionary entry, so we don't have to use a 
-                ; smudge bit or other hacks
-                lda CREATE
-                bne _done 
 
                 ; Reserve three more bytes for the hardcoded subroutine
                 ; call
@@ -3172,21 +3190,11 @@ _loop:          ; copy name string to dictionary entry
                 ; must point here
                 lda #$20        ; opcode of JSR 
                 sta (TMPADR),y
-                iny 
+                iny
                 lda #<fc_dovar  ; LSB
                 sta (TMPADR),y
                 iny
                 lda #>fc_dovar  ; MSB
-                sta (TMPADR),y
-
-                ; Clear variable: Though we haven't reserved the space yet,
-                ; we can already clear the next two bytes. This is totally
-                ; optional. Note that STZ doesn't have the mode we need, so 
-                ; we have to do it the hard way
-                lda #$00
-                iny
-                sta (TMPADR),y
-                iny 
                 sta (TMPADR),y
 
                 ; New entry complete. The first byte of this entry is now 
@@ -3196,7 +3204,7 @@ _loop:          ; copy name string to dictionary entry
                 lda TMPADR+1    ; MSB
                 sta DP+1
 
-_done:          ; get rid of the address left on stack
+                ; get rid of the address left on stack
                 inx             
                 inx
 
@@ -3300,14 +3308,67 @@ _findit:        ; convert to upper case because string must be Forth word
                 jsr l_findint
 
                 lda 1,x         ; we only need to check LSB for flag 
-                bne _found
+                bne pp_found
 
                 ; word not in dictionary, print error and abort
                 lda #$0b        ; string code for syntax error
                 jmp error
+.scend
 
+l_postpo_int:   ; This is the internal version of POSTPONE that lets us use
+                ; the funtion in subroutine calls. It is used by adding the
+                ; xt of the word we want to postpone AFTER the call:
+                ; 
+                ;       jsr l_postpo_int
+                ;       .byte <a_TARGETWORD
+                ;       .byte >a_TARGETWORD
+                ; 
+                ; The stack is not changed. 
+.scope 
+                ; make room on the stack for xt and flag 
+                dex
+                dex
+                dex
+                dex
 
-_found:         ; we start here with (xt f) on the stack, where f will be
+                ; The 65c02's stack contains xt LSB, xt MSB
+                pla
+                sta TMPADR
+                sta 3,x         ; put xt at NOS because flag goes TOS
+                pla
+                sta TMPADR+1
+                sta 4,x 
+
+                ; see if this is an immedate word
+                ldy #$02
+                lda (TMPADR),y
+                bmi _imm_flag
+
+                ; not immedate
+                lda #$FF        ; flag -1 
+                sta 1,x         ; LSB
+                sta 2,x         ; MSB
+                bra _finished
+
+_imm_flag:      ; immediate 
+                lda #$01        ; flag 1
+                sta 1,x         ; LSB
+                stz 2,x         ; MSB always zero
+
+_finished:      ; repair 65c02 stack for return jump 
+                lda TMPADR
+                clc
+                adc #$02
+                bcc + 
+                inc TMPADR+1
+*               tay
+                lda TMPADR+1
+                pha             ; push MSB first
+                phy             ; push LSB
+
+                ; we drop through to pp_found 
+
+pp_found:       ; we start here with (xt f) on the stack, where f will be
                 ; $0001 for immediate words and -1 ($FFFF) otherwise
                 lda 2,x         ; we use bit 7 of MSB for testing 
                 pha             ; wait with the test so we can clear stack
@@ -3463,17 +3524,21 @@ a_colon:        ; if we're already compiling, complain and return
                 lda #$0d        ; error code for wrong mode
                 jmp error 
 
-*               ; use the word version of CREATE 
-                lda #$FF
-                sta CREATE
+*               jsr l_create 
 
-                jsr l_create 
+                ; back up three bytes and overwrite the DOVAR jump command
+                sec
+                lda CP
+                sbc #$03
+                sta CP
+                bcs +
+                dec CP+1
 
                 ; we save the link (xt) of the new word to make life easier
                 ; when it is time to add it to the dictionary. COLON and 
                 ; SEMICOLON are the only routines allowed to access this 
                 ; variable
-                lda TMPADR      ; LSB 
+*               lda TMPADR      ; LSB 
                 sta WRKWRD
                 lda TMPADR+1    ; MSB 
                 sta WRKWRD+1
@@ -3483,8 +3548,6 @@ a_colon:        ; if we're already compiling, complain and return
                 lda #$FF
                 sta STATE
                 sta STATE+1
-
-                stz CREATE      ; reset create to default (paranoid) 
 
 z_colon:        rts
 .scend
@@ -3772,11 +3835,10 @@ z_gtname:       rts
 .scend
 ; -----------------------------------------------------------------------------
 ; GTBODY ( xt -- addr ) (">BODY")
-; Return Data Field address that corresponds to the execution token given. 
-; In our case, we return the address that is marked in the source code 
-; with "a_", that is, the beginning of the Data Field. 
-; Note that where Gforth lets you use >BODY to access the value of a VALUE 
-; (in violation of ANSI), Tali Forth does not; use TO. 
+; Return Data Field address (PFA in old versions) of words that were created
+; by CREATE. This is "the address that would have been returned if HERE had
+; been called after CREATE". Note that >BODY returns garbage for words that
+; haven't been defined with CREATE
 l_gtbody:       bra a_gtbody
                 .byte NC+$05 
                 .word l_gtname  ; link to GTNAME (">NAME")
@@ -3798,10 +3860,11 @@ a_gtbody:       ; lucky for us, a xt is the same as the start address
                 ; The offset from the header to the body is always very small
                 ; and never in danger of producing a carry. We can get away
                 ; with increasing it by two bytes (for the correct offset
-                ; from the beginning of the header) without checking for 
-                ; carry
-                inc
-                inc 
+                ; from the beginning of the header) and then another three
+                ; (since the data field starts after a JSR) without checking 
+                ; for carry
+                clc
+                adc #$05
 
                 ; add offset to address. This, however, might produce a
                 ; carry 
@@ -3813,13 +3876,73 @@ a_gtbody:       ; lucky for us, a xt is the same as the start address
                 sta 2,x 
 
 z_gtbody:       rts
+; ----------------------------------------------------------------------------
+; BRACKETTICK ( "name" -- )  (['])
+; Used in compilation: Store xt of word "name" in word so that the token is
+; placed on the stack during runtime. Note we can't call this directly
+; as a JSR because it expects "name" in stream. Use l_btick_int instead
+l_btick:        bra a_btick
+                .byte IM+CO+$03
+                .word l_gtbody  ; link to >BODY
+                .word z_btick
+                .byte "[']"
+
+.scope
+a_btick:        jsr l_tick      ; put xt on stack  
+                jsr l_lit       ; put in stream
+
+z_btick:        rts
+.scend
+
+; Internal version of BRACKETTICK: Use this to call ['] in subroutine 
+; word definitions in the form of 
+;
+;               jsr l_btick_int
+;               .byte <a_WORD   ; LSB
+;               .byte >a_WORD   ; MSB
+; 
+; Compare use to l_postpo_int
+l_btick_int: 
+.scope
+                ; make room on the stack for xt
+                dex
+                dex
+
+                ; The 65c02's stack points xt LSB, xt MSB
+                pla
+                sta TMPADR
+                pla
+                sta TMPADR+1    
+
+                ; get the target xt address
+                lda (TMPADR)    ; gives us LSB of target 
+                sta 1,x
+
+                inc TMPADR
+                bne +
+                inc TMPADR+1
+
+*               lda (TMPADR)    ; gives us MSB of target
+                sta 2,x
+
+                ; repair 65c02 stack for return jump 
+                inc TMPADR
+                bne +
+                inc TMPADR+1
+*               lda TMPADR+1
+                pha             ; MSB first 
+                lda TMPADR
+                pha 
+
+                jmp l_lit       ; JSR/RTS
+.scend
 ; -----------------------------------------------------------------------------
 ; TICK ( "name" -- xt ) ("'")
 ; Figure out the execution toke (xt) given the name. We let PARSE-NAME 
 ; and FIND do the heavy lifting
 l_tick:         bra a_tick
                 .byte NC+$01 
-                .word l_gtbody  ; link to >BODY
+                .word l_btick;  link to [']
                 .word z_tick
                 .byte "'"
 .scope
@@ -3861,13 +3984,100 @@ _found:         ; we don't care if word is immediate or whatever, just
 
 z_tick:         rts
 .scend
+; ----------------------------------------------------------------------------
+; DEFER ( "name" -- )
+; Reserve a name that can be linked to various xt. The ANSI reference
+; implementation is 
+;       CREATE ['] ABORT , DOES> @ EXECUTE ; 
+l_defer:        bra a_defer
+                .byte $05 
+                .word l_tick    ; link to TICK
+                .word z_defer
+                .byte "DEFER"
+
+.scope
+a_defer:        stz CREATE      ; standard version of create 
+                jsr l_create
+
+                ; TESTING
+                lda #<l_abort
+                sta $00
+                lda #>l_abort
+                sta $01
+
+                jsr l_btick_int ; ['] internal version 
+                .byte <l_abort
+                .byte >l_abort
+                jsr l_comma
+                jsr l_does
+                jsr l_fetch
+                jsr l_exe
+
+z_defer:        rts
+; HIER HIER 
+.scend
+; ----------------------------------------------------------------------------
+; IS ( -- )
+l_is:           bra a_is
+                .byte $02 
+                .word l_defer    ; link to DEFER
+                .word z_is
+                .byte "IS"
+
+.scope
+a_is:           nop
+
+z_is:           rts
+.scend
+; ----------------------------------------------------------------------------
+; DEFERSTORE ( xt2 xt1 -- ) (DEFER!)
+; Set the word xt1 to execute xt2
+l_deferstore:   bra a_deferstore
+                .byte $06 
+                .word l_is    ; link to IS
+                .word z_deferstore
+                .byte "DEFER!"
+
+.scope
+a_deferstore:   jsr l_gtbody    ; >BODY
+                jsr l_store     ; !
+
+z_deferstore:   rts
+.scend
+
+; ----------------------------------------------------------------------------
+; DEFERFETCH ( -- ) (DEFER@)
+l_deferfetch:   bra a_deferfetch
+                .byte $06 
+                .word l_deferstore    ; link to DEFER!
+                .word z_deferfetch
+                .byte "DEFER@"
+
+.scope
+a_deferfetch:   nop
+
+z_deferfetch:   rts
+.scend
+; ----------------------------------------------------------------------------
+; ACTIONOF ( -- )
+l_actionof:     bra a_actionof
+                .byte $09 
+                .word l_deferfetch    ; link to DEFER@
+                .word z_actionof
+                .byte "ACTION-OF"
+
+.scope
+a_actionof:     nop
+
+z_actionof:     rts
+.scend
 ; -----------------------------------------------------------------------------
 ; COMMA ( x -- ) (",")
 ; Allot one cell (two bytes) and store x in memory. We ignore all alignment
 ; issues on the 8 bit machine.
 l_comma:        bra a_comma
                 .byte NC+$01 
-                .word l_tick    ; link to TICK
+                .word l_actionof    ; link to ACTION-OF
                 .word z_comma
                 .byte ","
 .scope
@@ -7057,6 +7267,7 @@ z_tor:          rts
 ; -----------------------------------------------------------------------------
 ; FETCH  ( c-addr -- n ) ("@")
 ; Get one cell (16 bit) value from address. 
+; TODO rewrite with Y as temporary storage?
 l_fetch:        bra a_fetch
                 .byte NC+$01 
                 .word l_tor     ; link to TOR (">R")
@@ -7200,6 +7411,8 @@ z_words:        rts
 
 ; TODO see if we need all of this or just can't put these all at the end
 ; of the file and have EVALUATE run through them
+; TODO see if we can't use the internal version of POSTPONE (l_postpo_int) to 
+; get rid of all of these
 fhltbl:
         .word fh_if, fh_then, fh_else, fh_until, fh_while, fh_rpt
         .word fh_do, fh_loop, fh_ploop

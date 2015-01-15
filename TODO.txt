@@ -1,11 +1,12 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 10. Jan 2015
+This version: 11. Jan 2015
 
 === SHORT TERM === 
 
 List of words that should be coded first:
 
+?
 ?DO 
 ABORT" 
 LEAVE 
@@ -19,6 +20,8 @@ NEXTNAME (not ANSI, from gforth)
 
 === LONGER TERM ===
 
+- use internal version of POSTPONE (l_postpoint) to clean up code
+- use LITERAL (l_lit) to clean up code (compare ['] routine)
 - include interrupts in kernel
 - cut kernel further down to size
 - remove .invokes, edit MACRO file 
