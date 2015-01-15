@@ -3538,9 +3538,9 @@ a_colon:        ; if we're already compiling, complain and return
                 ; when it is time to add it to the dictionary. COLON and 
                 ; SEMICOLON are the only routines allowed to access this 
                 ; variable
-*               lda TMPADR      ; LSB 
+*               lda DP          ; LSB 
                 sta WRKWRD
-                lda TMPADR+1    ; MSB 
+                lda DP+1        ; MSB 
                 sta WRKWRD+1
 
                 ; Basic header complete. Now set compile flag. From now on, 
@@ -3857,17 +3857,7 @@ a_gtbody:       ; lucky for us, a xt is the same as the start address
                 ldy #$01
                 lda (TMPADR),y
 
-                ; The offset from the header to the body is always very small
-                ; and never in danger of producing a carry. We can get away
-                ; with increasing it by two bytes (for the correct offset
-                ; from the beginning of the header) and then another three
-                ; (since the data field starts after a JSR) without checking 
-                ; for carry
-                clc
-                adc #$05
-
-                ; add offset to address. This, however, might produce a
-                ; carry 
+                ; add offset to address
                 clc 
                 adc TMPADR      ; LSB
                 sta 1,x 
@@ -3989,6 +3979,7 @@ z_tick:         rts
 ; Reserve a name that can be linked to various xt. The ANSI reference
 ; implementation is 
 ;       CREATE ['] ABORT , DOES> @ EXECUTE ; 
+; HIER HIER 
 l_defer:        bra a_defer
                 .byte $05 
                 .word l_tick    ; link to TICK
@@ -3996,15 +3987,7 @@ l_defer:        bra a_defer
                 .byte "DEFER"
 
 .scope
-a_defer:        stz CREATE      ; standard version of create 
-                jsr l_create
-
-                ; TESTING
-                lda #<l_abort
-                sta $00
-                lda #>l_abort
-                sta $01
-
+a_defer:        jsr l_create
                 jsr l_btick_int ; ['] internal version 
                 .byte <l_abort
                 .byte >l_abort
@@ -4014,7 +3997,6 @@ a_defer:        stz CREATE      ; standard version of create
                 jsr l_exe
 
 z_defer:        rts
-; HIER HIER 
 .scend
 ; ----------------------------------------------------------------------------
 ; IS ( -- )

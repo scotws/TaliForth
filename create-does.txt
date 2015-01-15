@@ -26,9 +26,7 @@ CONSTANT is a "defining words", one that makes new words. In pseudocode, the abo
    b:   jsr FETCH
         rts
 
-By default, CREATE adds a jump to the routine DOVAR in its Code Field Area (CFA). (Note the CFA has a fixed length -- three bytes in our case -- which is important for words such as >BODY.) DOVAR puts the address of the first cell after the header code - the first cell of the Parameter Field Area (PFA) - on the Data Stack. 
-
-To make things easier to explain later, we've added the labels "a" and "b" in the listing. Note that DOES> is an immediate word that adds two subroutine jumps, one to (DOES>) and one to DODOES, which is a pre-defined system routine like DOVAR. We'll see what it does later.
+Note that DOES> adds two new commands. To make things easier to explain later, we've added the labels "a" and "b" in the listing. Note that DOES> is an immediate word that adds two subroutine jumps, one to (DOES>) and one to DODOES, which is a pre-defined system routine like DOVAR. We'll see what it does later.
 
 SEQUENCE II: Executing the word CONSTANT / creating LIFE 
 
@@ -105,10 +103,7 @@ DODOES: Pop stack (CONSTANT's PFA), increase address by one, store on Zero Page;
 
 Remember we have to increase the address by one because of the way JSR stores the return address for RTS on the stack on the 65c02: It points to the third byte of the JSR instruction itself, not the actual return address.
 
-
-
-
-In Tali Forth, the XT of a word is a pointer to the CFA, and >BODY gives us the PFA by assuming that it will always be three bytes (one JSR instruction) below the CFA. Remember that >BODY is only to be used with words that were compiled by CREATE -- using it on anything else will result in unpredictable behavior, probably crashing the machine. 
+Remember that >BODY is only to be used with words that were compiled by CREATE -- using it on anything else will result in unpredictable behavior, probably crashing the machine. 
 
 (For example, >BODY is used for the ANS reference definitions of DEFER and friends: 
 
