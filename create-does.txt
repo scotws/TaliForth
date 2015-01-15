@@ -26,7 +26,9 @@ CONSTANT is a "defining words", one that makes new words. In pseudocode, the abo
    b:   jsr FETCH
         rts
 
-DOVAR puts the address of the first cell after the header code - the first cell of the Parameter Field Area (PFA) - on the Data Stack. To make things easier to explain later, we've added the labels "a" and "b" in the listing. Note that DOES> is an immediate word that adds two subroutine jumps, one to (DOES>) and one to DODOES, which is a pre-defined system routine like DOVAR. We'll see what it does later.
+By default, CREATE adds a jump to the routine DOVAR in its Code Field Area (CFA). (Note the CFA has a fixed length -- three bytes in our case -- which is important for words such as >BODY.) DOVAR puts the address of the first cell after the header code - the first cell of the Parameter Field Area (PFA) - on the Data Stack. 
+
+To make things easier to explain later, we've added the labels "a" and "b" in the listing. Note that DOES> is an immediate word that adds two subroutine jumps, one to (DOES>) and one to DODOES, which is a pre-defined system routine like DOVAR. We'll see what it does later.
 
 SEQUENCE II: Executing the word CONSTANT / creating LIFE 
 
