@@ -3,7 +3,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  16. Jan 2015
+; This version  17. Jan 2015
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -7396,8 +7396,8 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version ALPHA 004 (10. Jan 2015)",0
-fs_disclaim:   .byte "Tali Forth comes with absolutely no warranty",0
+fs_version:    .byte "Version ALPHA 004 (17. Jan 2015)",0
+fs_disclaim:   .byte "Tali Forth comes with absolutely NO WARRANTY",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0
 fs_compile:    .byte " compiled",0
