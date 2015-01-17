@@ -4487,6 +4487,7 @@ l_erase:        bra a_erase
                 .word z_erase
                 .byte "ERASE"
 
+.scope
 a_erase:        dex
                 dex
                 stz 1,x
@@ -4495,6 +4496,83 @@ a_erase:        dex
                 jsr l_fill      ; don't combine JSR/RTS so we can compile 
 
 z_erase:        rts
+.scend
+; ----------------------------------------------------------------------------
+; MARKER ( "name" -- )
+; Create deletion boundry to restore dictionary to earlier state. Note that
+; old dictionary entries are not erased, but will be overwritten. 
+; HIER HIER 
+l_marker:       bra a_marker
+                .byte IM+$06 
+                .word l_erase   ; link to ERASE
+                .word z_marker
+                .byte "MARKER"
+.scope
+a_marker:       ; This is a defining word
+                jsr l_create 
+
+                ; add current DP as payload - this is the DP of the 
+                ; marker itself
+                ldy #$00
+                lda DP
+                sta (CP),y
+                iny
+                lda DP+1
+                sta (CP),y
+                iny 
+
+                ; adjust CP
+                tya
+                clc
+                adc CP
+                sta CP
+                bcc +
+                inc CP+1
+
+                ; continue with normal Forth word
+*               jsr l_pdoes     ; DOES> by hand: added (DOES>) and DODOES
+                jsr fc_dodoes   
+
+                ; -- DOES> payload --- 
+                jsr l_fetch     ; get the old DP
+
+                ; What we get on the stack is the DP of the marker itself, 
+                ; but we need the DP of the previous word
+                lda 1,x
+                sta TMPADR
+                lda 2,x
+                sta TMPADR+1
+                inx
+                inx
+
+                ; the link to the previous DP is three bytes down
+                ldy #$03
+                lda (TMPADR),y
+                sta DP
+                iny
+                lda (TMPADR),y
+                sta DP+1
+
+                ; adjust CP to the byte after end of this new word
+                ; at offset 5 (the sixth byte) we have the z_* link to 
+                ; the end of this word. Use this to get the new Compiler
+                ; Pointer (CP) ...
+                ldy #$05
+                lda (DP),y  ; LSB
+                sta CP
+                iny
+                lda (DP),y  ; MSB
+                sta CP+1
+
+                ; ... except that the RAM available points to the address
+                ; one byte after that
+                inc CP
+                bne _done
+                inc CP+1
+
+_done: 
+z_marker:       rts
+.scend
 ; -----------------------------------------------------------------------------
 ; UNUSED ( -- u ) 
 ; Return amount of RAM available ("in address units"). Note that this 
@@ -4502,7 +4580,7 @@ z_erase:        rts
 ; buffers. Assumes memory is a continuous region starting at $0000
 l_unused:       bra a_unused
                 .byte NC+$06 
-                .word l_erase   ; link to ERASE
+                .word l_marker    ; link to MARKER
                 .word z_unused
                 .byte "UNUSED"
 
