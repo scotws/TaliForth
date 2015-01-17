@@ -7163,7 +7163,7 @@ l_tor:          bra a_tor
                 .word l_fromr    ; link to FROM R ("R>")
                 .word z_tor
                 .byte ">R"
-
+.scope
 a_tor:          ; save the return address
                 pla             ; LSB
                 sta TMPADR
@@ -7186,13 +7186,28 @@ a_tor:          ; save the return address
                 inx
 
 z_tor:          rts
+.scend
+; -----------------------------------------------------------------------------
+; QUESTION( c-addr -- ) ("?")
+; Print contant of a variable 
+l_quest:        bra a_quest
+                .byte NC+$01 
+                .word l_tor     ; link to TOR (">R")
+                .word z_quest
+                .byte "?"
+
+.scope
+a_quest:        jsr l_fetch
+                jsr l_dot
+z_quest:        rts
+.scend
 ; -----------------------------------------------------------------------------
 ; FETCH  ( c-addr -- n ) ("@")
 ; Get one cell (16 bit) value from address. 
 ; TODO rewrite with Y as temporary storage?
 l_fetch:        bra a_fetch
                 .byte NC+$01 
-                .word l_tor     ; link to TOR (">R")
+                .word l_quest   ; link to QUESTION ("?")
                 .word z_fetch
                 .byte "@"
 

@@ -6,7 +6,6 @@ This version: 17. Jan 2015
 
 List of words that still need to be coded
 
-? (QUESTION)
 ?DO 
 2>R (SWAP >R >R)
 2R> (R> R> SWAP)
