@@ -12,7 +12,6 @@ List of words that still need to be coded
 2R@ (R> R> 2DUP >R >R SWAP)
 ABORT" 
 LEAVE 
-MARKER
 MOVE 
 NEXTNAME (not ANSI, from gforth) 
 RECURSE
