@@ -2,7 +2,7 @@ Header Structure for the Dictionary
 of Tali Forth for the 65c02
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 19. Jan 2014
-This version:  17. Feb 2014
+This version:  16. Jan 2015
 
 This document describes the structure of the Tali Forth dictionary entries. The design stresses simple design and execution speed at the cost of size. 
 
@@ -14,7 +14,7 @@ The entries are linked through pointers to their first bytes (l_xxxx), which are
 
 The following two bytes are the link to the next dictionary entry (l_yyyy). A zero in both bytes marks the end of the list. 
 
-z_xxxx points to the end of the Code Field and is included to allow the compiling of native code. The byte it points to is not encoded (usually the RTS instruction).
+z_xxxx points to the end of the Code Field and is included to allow the compiling of native code. The byte it points to is not encoded (usually the RTS instruction). Note that it might make more sense to code this as an offset, not a pointer, which would save one byte per word and would make looping easier. This might be changed in the future. 
 
 The Name Fields starts at an offset of seven bytes from the head of the entry. Names are 7-bit uppercase ASCII. This field can be 31 bytes long. 
 

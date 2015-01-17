@@ -1,13 +1,12 @@
 README for Tali Forth for the 65c02 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 19. Jan 2014
-This version:  10. Jan 2015
+This version:  16. Jan 2015
 
 
-This is the README.txt version released with Tali Forth ALPHA 004. Note that
-this is an ALPHA release of an incomplete program. See the .ods spreadsheet for
-a list of supported instructions, or type WORDS once Tali Forth is running. 
+This is the README.txt version released with Tali Forth ALPHA 004. Note that this is an ALPHA release of an incomplete program. See the .ods spreadsheet for a list of supported instructions, or type WORDS once Tali Forth is running. Tali Forth is hosted at GitHub, you can find the most current version at 
 
+        https://github.com/scotws/TaliForth
 
 
 INTRODUCTION
@@ -32,13 +31,13 @@ Tali Forth aims to be, in rough order of priority:
   
 - Speedy. Tali Forth places speed over size (within reason). The aim is to keep
   it and the kernel routines in 8k of ROM for single board computers. A further
-  8k (not implemented yet) for a library of Forth routines.
+  8k could be used for a library of Forth routines.
 
 
 
-IMPLEMENTATION NOTES (ALPHA 001) 
+IMPLEMENTATION NOTES (ALPHA 004) 
 
-Important core words are still missing. Other parts have barely been tested. Forth words that are depreciated such as WORD will be implemented last (if at all). None of the Block vocabulary is yet implemented. 
+Important core words are still missing. Other parts have barely been tested. Forth words that are depreciated such as WORD will be implemented last (if at all). 
 
 Tali Forth uses subroutine threading for longer words but automatically compiles shorter routines in native 65c02 code. In the current version, the decision which words are compiled how is on an ad-hoc basis; in future, this will follow a rule based on speed and size of the routine. 
 

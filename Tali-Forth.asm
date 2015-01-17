@@ -3,7 +3,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  15. Jan 2015
+; This version  16. Jan 2015
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -797,7 +797,6 @@ z_bye:          rts             ; never reached, require for native compile
 ; ----------------------------------------------------------------------------
 ; COLD ( -- )
 ; Reboot the Forth system
-; TODO see if we need to drop down to the kernel to clear RAM etc
 l_cold:         bra a_cold
                 .byte $04 
                 .word l_bye     ; link to BYE
@@ -852,7 +851,7 @@ a_plit:         ; make room on stack
 z_plit:         rts
 .scend
 ; -----------------------------------------------------------------------------
-; LITERAL ( x --  ) 
+; LITERAL ( n --  ) 
 ; During compilation, add number to compiled word so that (LITERAL) is called
 ; during execution. This is an immediate, compile-only word
 l_lit:          bra a_lit
@@ -890,10 +889,9 @@ z_lit:          rts
 ; -----------------------------------------------------------------------------
 ; ABORT ( -- ) 
 ; Reset the parameter (data) stack pointer and continue as QUIT 
-; TODO See if the jump to l_quit will compile natively as it ends with
-; a BRA. 
+; Note we can jump here via subroutine because we reset the stack pointer anyway
 l_abort:        bra a_abort
-                .byte NC+$05 
+                .byte $05 
                 .word l_lit     ; link to LITERAL
                 .word z_abort
                 .byte "ABORT"
@@ -906,9 +904,7 @@ a_abort:        ldx #SP0        ; Reset stack pointer
                 stz INPORT
                 stz INPORT+1
 
-                jmp l_quit      ; ABORT always flows into quit
-
-z_abort:        rts             ; never reached, required for native compile 
+z_abort:        jmp l_quit      ; ABORT always flows into quit
 ; -----------------------------------------------------------------------------
 ; QUIT ( -- ) 
 ; Endless interpreter loop. Resets the return stack so it can't be accessed by 
@@ -2859,24 +2855,18 @@ z_value:
 ; ----------------------------------------------------------------------------
 ; TO ( n "name" -- ) 
 ; Change the value of a VALUE. Note that in theory this would work with
-; CONSTANT as well, but we frown on this behavior. Also note that while 
-; Gforth lets you chage the value of a VALUE with >BODY +! (in violation
-; of ANSI), we do not.  
+; CONSTANT as well, but we frown on this behavior. Note that while it is
+; in violation of ANS Forth, we can change the number in a VALUE with
+; <number> ' <value> >BODY +!   just as you can with Gforth
 l_to:           bra a_to
-                .byte $02 
+                .byte NC+$02 
                 .word l_value   ; link to VALUE
                 .word z_to
                 .byte "TO"
 
 .scope
-a_to:           jsr l_tick      ; ' (TICK)
+a_to:           jsr l_tick      ; ' 
                 jsr l_gtbody    ; >BODY
-                dex             ; VALUE payload starts three bytes
-                dex             ; below >BODY begin 
-                lda #$03                
-                sta 1,x         ; LSB 
-                stz 2,x
-                jsr l_plus 
                 jsr l_store     
 
 z_to:           rts
@@ -3857,8 +3847,14 @@ a_gtbody:       ; lucky for us, a xt is the same as the start address
                 ldy #$01
                 lda (TMPADR),y
 
-                ; add offset to address
-                clc 
+                ; now we have to add two because of the way BRA works, and
+                ; three to skip over the CFA to the PFA (CFA is always three
+                ; bytes long). 
+                clc
+                adc #$05
+
+                ; now add offset to address
+                clc             ; PARANOID, should never be required
                 adc TMPADR      ; LSB
                 sta 1,x 
                 lda TMPADR+1    ; MSB
@@ -3867,64 +3863,20 @@ a_gtbody:       ; lucky for us, a xt is the same as the start address
 
 z_gtbody:       rts
 ; ----------------------------------------------------------------------------
-; BRACKETTICK ( "name" -- )  (['])
+; BRACKET-TICK ( "name" -- )  (['])
 ; Used in compilation: Store xt of word "name" in word so that the token is
-; placed on the stack during runtime. Note we can't call this directly
-; as a JSR because it expects "name" in stream. Use l_btick_int instead
+; placed on the stack during runtime. This cannot really be called inside a
+; assembler routine because it looks for the word in the input stream. This
+; word cannot be natively compiled.
 l_btick:        bra a_btick
                 .byte IM+CO+$03
                 .word l_gtbody  ; link to >BODY
-                .word z_btick
+                .word z_btick   ; dummy, cannot be natively compiled
                 .byte "[']"
 
 .scope
-a_btick:        jsr l_tick      ; put xt on stack  
-                jsr l_lit       ; put in stream
-
-z_btick:        rts
-.scend
-
-; Internal version of BRACKETTICK: Use this to call ['] in subroutine 
-; word definitions in the form of 
-;
-;               jsr l_btick_int
-;               .byte <a_WORD   ; LSB
-;               .byte >a_WORD   ; MSB
-; 
-; Compare use to l_postpo_int
-l_btick_int: 
-.scope
-                ; make room on the stack for xt
-                dex
-                dex
-
-                ; The 65c02's stack points xt LSB, xt MSB
-                pla
-                sta TMPADR
-                pla
-                sta TMPADR+1    
-
-                ; get the target xt address
-                lda (TMPADR)    ; gives us LSB of target 
-                sta 1,x
-
-                inc TMPADR
-                bne +
-                inc TMPADR+1
-
-*               lda (TMPADR)    ; gives us MSB of target
-                sta 2,x
-
-                ; repair 65c02 stack for return jump 
-                inc TMPADR
-                bne +
-                inc TMPADR+1
-*               lda TMPADR+1
-                pha             ; MSB first 
-                lda TMPADR
-                pha 
-
-                jmp l_lit       ; JSR/RTS
+a_btick:        jsr l_tick
+z_btick:        jmp l_lit       ; JSR/RTS
 .scend
 ; -----------------------------------------------------------------------------
 ; TICK ( "name" -- xt ) ("'")
@@ -3977,9 +3929,8 @@ z_tick:         rts
 ; ----------------------------------------------------------------------------
 ; DEFER ( "name" -- )
 ; Reserve a name that can be linked to various xt. The ANSI reference
-; implementation is 
-;       CREATE ['] ABORT , DOES> @ EXECUTE ; 
-; HIER HIER 
+; implementation is  CREATE ['] ABORT , DOES> @ EXECUTE ;  but ['] 
+; doesn't lend itself to assembler coding as a jump (expects name in stream). 
 l_defer:        bra a_defer
                 .byte $05 
                 .word l_tick    ; link to TICK
@@ -3988,35 +3939,42 @@ l_defer:        bra a_defer
 
 .scope
 a_defer:        jsr l_create
-                jsr l_btick_int ; ['] internal version 
-                .byte <l_abort
-                .byte >l_abort
-                jsr l_comma
-                jsr l_does
+                ; ['] ABORT ,  does nothing more but put the xt of ABORT
+                ; in the word. We can do that quicker in assembler. Also, 
+                ; we want more than ABORT, we want an error message. CREATE
+                ; will add DOVAR, we add the xt with a stripped-down version
+                ; of COMMA
+                lda #<e_defer   ; LSB of xt 
+                sta (CP)
+                inc CP
+                bne +
+                inc CP+1 
+
+*               lda #>e_defer   ; MSB of xt
+                sta (CP)
+                inc CP          ; next byte
+                bne _done
+                inc CP+1
+
+_done:          ; continue with normal Forth word
+                jsr l_pdoes     ; DOES> by hand: added (DOES>) and DODOES
+                jsr fc_dodoes   
                 jsr l_fetch
                 jsr l_exe
 
 z_defer:        rts
-.scend
-; ----------------------------------------------------------------------------
-; IS ( -- )
-l_is:           bra a_is
-                .byte $02 
-                .word l_defer    ; link to DEFER
-                .word z_is
-                .byte "IS"
 
-.scope
-a_is:           nop
-
-z_is:           rts
+; Error subroutine for undefined DEFER: Complain and go to ABORT. 
+e_defer:        lda #$16        ; code for DEFER ERROR 
+                jmp error
 .scend
 ; ----------------------------------------------------------------------------
 ; DEFERSTORE ( xt2 xt1 -- ) (DEFER!)
-; Set the word xt1 to execute xt2
+; Set the word xt1 (the DEFERed word) to execute xt2. ANS reference
+; implementation is   : DEFER! >BODY ! ; 
 l_deferstore:   bra a_deferstore
-                .byte $06 
-                .word l_is    ; link to IS
+                .byte NC+$06 
+                .word l_defer    ; link to DEFER
                 .word z_deferstore
                 .byte "DEFER!"
 
@@ -4026,32 +3984,21 @@ a_deferstore:   jsr l_gtbody    ; >BODY
 
 z_deferstore:   rts
 .scend
-
 ; ----------------------------------------------------------------------------
-; DEFERFETCH ( -- ) (DEFER@)
+; DEFERFETCH ( xt1 -- xt2 ) (DEFER@)
+; Fetch the xt that the DEFERed word xt1 is pointing to. ANS reference
+; implemenation is   : DEFER@ >BODY @ ; 
 l_deferfetch:   bra a_deferfetch
-                .byte $06 
+                .byte NC+$06 
                 .word l_deferstore    ; link to DEFER!
                 .word z_deferfetch
                 .byte "DEFER@"
 
 .scope
-a_deferfetch:   nop
+a_deferfetch:   jsr l_gtbody    ; >BODY
+                jsr l_fetch     ; @
 
 z_deferfetch:   rts
-.scend
-; ----------------------------------------------------------------------------
-; ACTIONOF ( -- )
-l_actionof:     bra a_actionof
-                .byte $09 
-                .word l_deferfetch    ; link to DEFER@
-                .word z_actionof
-                .byte "ACTION-OF"
-
-.scope
-a_actionof:     nop
-
-z_actionof:     rts
 .scend
 ; -----------------------------------------------------------------------------
 ; COMMA ( x -- ) (",")
@@ -4059,7 +4006,7 @@ z_actionof:     rts
 ; issues on the 8 bit machine.
 l_comma:        bra a_comma
                 .byte NC+$01 
-                .word l_actionof    ; link to ACTION-OF
+                .word l_deferfetch    ; link to DEFER@
                 .word z_comma
                 .byte ","
 .scope
@@ -4086,7 +4033,6 @@ z_comma:        rts
 ; u < 0, release u units of data space, though only to the beginning of the
 ; RAM originally available. Note we ignore alignment issues completely, as
 ; this is a 8 bit machine. 
-; TODO adapt when we have buffers 
 l_allot:        bra a_allot
                 .byte $05 
                 .word l_comma   ; link to COMMA (",")
@@ -4112,7 +4058,6 @@ a_allot:        ; if we got a zero, forget the whole thing
                 sta CP+1
 
                 ; make sure we've not alloted more than we have
-                ; TODO change to accomindate for buffers
                 sec
                 lda #<RamEnd    ; LSB
                 sbc CP          ; don't save result, just need the carry
@@ -5049,7 +4994,6 @@ z_two:          rts
 ; DDOTR ( d n -- ) ("D.R") 
 ; Print right-justified signed double-cell number
 ; Forth code is   >R TUCK DABS <# #S ROT SIGN #> R> OVER - SPACES TYPE
-; TODO rewrite with more assembler 
 l_ddotr:        bra a_ddotr
                 .byte $03 
                 .word l_two     ; link to TWO ("2")
@@ -5082,8 +5026,7 @@ l_ddot:         bra a_ddot
                 .word z_ddot
                 .byte "D."
 .scope
-a_ddot:         ; TODO convert as much as possible to assembler 
-                jsr l_tuck      ; TUCK
+a_ddot:         jsr l_tuck      ; TUCK
                 jsr l_dabs      ; DABS  
                 jsr l_ltnum     ; <#
                 jsr l_nums      ; #S
@@ -5105,8 +5048,7 @@ l_dotr:         bra a_dotr
                 .word z_dotr
                 .byte ".R"
 .scope
-a_dotr:         ; TODO convert as much as possible to assembler 
-                jsr l_tor       ; >R
+a_dotr:         jsr l_tor       ; >R
                 jsr l_dup       ; DUP
                 jsr l_abs       ; ABS 
                 jsr l_zero      ; 0
@@ -5133,8 +5075,7 @@ l_dot:          bra a_dot
                 .word z_dot
                 .byte "."
 
-a_dot:          ; TODO Convert parts to assembler
-                jsr l_dup       ; DUP 
+a_dot:          jsr l_dup       ; DUP 
                 jsr l_abs       ; ABS 
                 jsr l_zero      ; ZERO 
                 jsr l_ltnum     ; <#
@@ -5175,8 +5116,7 @@ l_udotr:        bra a_udotr
                 .word z_udotr
                 .byte "U.R"
 .scope
-a_udotr:        ; TODO optimize with assembler code 
-                jsr l_tor       ; >R
+a_udotr:        jsr l_tor       ; >R
                 jsr l_zero      ; 0
                 jsr l_ltnum     ; <#
                 jsr l_nums      ; #S
@@ -7397,7 +7337,7 @@ z_words:        rts
 ; get rid of all of these
 fhltbl:
         .word fh_if, fh_then, fh_else, fh_until, fh_while, fh_rpt
-        .word fh_do, fh_loop, fh_ploop
+        .word fh_do, fh_loop, fh_ploop, fh_is, fh_actionof 
         .word $0000
 
 ; All high-level command strings are uppercase and start with fh_ . Note 
@@ -7410,6 +7350,8 @@ fhltbl:
 ; See https://groups.google.com/forum/#!msg/comp.lang.forth/UMYrU1aRIW4/eV3qDk06Vs0J
 ; and http://blogs.msdn.com/b/ashleyf/archive/2011/02/04/if-else-then.aspx
 ; for discussions on IF ELSE THEN
+; See http://www.forth200x.org/documents/html/implement.html for reference
+; implementations of ANS Forth
 
 ; len -->  0    0   1    1    2    2    3    3    4    4    5    5    6    6    7
 ;          0    5   0    5    0    5    0    5    0    5    0    5    0    5    0
@@ -7431,8 +7373,12 @@ fh_loop:
 .byte 77, ": LOOP POSTPONE 1 POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
 fh_ploop:
 .byte 67, ": +LOOP POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
-; len -->  0    0   1    1    2    2    3    3    4    4    5    5    6    6    7
-;          0    5   0    5    0    5    0    5    0    5    0    5    0    5    0
+fh_is:
+.byte 75, ": IS STATE @ IF POSTPONE ['] POSTPONE DEFER! ELSE ' DEFER! THEN ; IMMEDIATE"
+fh_actionof: 
+.byte 82, ": ACTION-OF STATE @ IF POSTPONE ['] POSTPONE DEFER@ ELSE ' DEFER@ THEN ; IMMEDIATE"
+; len -->  0    0   1    1    2    2    3    3    4    4    5    5    6    6    7    7    8
+;          0    5   0    5    0    5    0    5    0    5    0    5    0    5    0    5    0
 
 ; =============================================================================
 ; STRINGS
@@ -7445,7 +7391,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
         .word fse_channel, fse_divzero, fse_noname, fse_syntax  ; 08-0B
         .word fse_componly, fse_intonly, fse_empty, fs_xt       ; 0C-0F
         .word fs_f_IM, fs_f_CO, fs_f_NC, fs_dic_link            ; 10-13
-        .word fs_datadump, fse_radix                            ; 14-17
+        .word fs_datadump, fse_radix, fse_defer                 ; 14-17
 
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
@@ -7476,6 +7422,7 @@ fse_componly:  .byte "Interpreting a compile-only word",0
 fse_intonly:   .byte "Not in interpret mode",0
 fse_empty:     .byte " (empty)",0
 fse_radix:     .byte "Digit larger than base",0
+fse_defer:     .byte "DEFERed word not defined yet",0
 
 ; ----------------------------------------------------------------------------- 
 ; Helper strings. These can have various formats. Leave hexstring as the last

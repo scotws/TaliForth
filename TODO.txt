@@ -1,30 +1,27 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 11. Jan 2015
+This version: 17. Jan 2015
 
 === SHORT TERM === 
 
-List of words that should be coded first:
+List of words that still need to be coded
 
 ?
 ?DO 
-ABORT" 
-LEAVE 
 2R> 
 2>R 
-DEFER IS DEFER! DEFER@ ACTION-OF
-MS
-TIME&DATE (req hardware support)
-WORD
+ABORT" 
+LEAVE 
+MOVE 
 NEXTNAME (not ANSI, from gforth) 
+WORD
+
+Completing all words on this list will trigger BETA status
 
 === LONGER TERM ===
 
 - use internal version of POSTPONE (l_postpoint) to clean up code
 - use LITERAL (l_lit) to clean up code (compare ['] routine)
-- include interrupts in kernel
-- cut kernel further down to size
-- remove .invokes, edit MACRO file 
 - simplify high-level word definitions
 - check code for use of BIT 
-- See if S" conforms to Gforth usage
+- See if S" conforms to Gforth usage (doesn't look like it)
