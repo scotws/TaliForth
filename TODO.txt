@@ -6,14 +6,17 @@ This version: 17. Jan 2015
 
 List of words that still need to be coded
 
-?
+? (QUESTION)
 ?DO 
-2R> 
-2>R 
+2>R (SWAP >R >R)
+2R> (R> R> SWAP)
+2R@ (R> R> 2DUP >R >R SWAP)
 ABORT" 
 LEAVE 
+MARKER
 MOVE 
 NEXTNAME (not ANSI, from gforth) 
+RECURSE
 WORD
 
 Completing all words on this list will trigger BETA status
