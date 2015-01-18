@@ -3,7 +3,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  17. Jan 2015
+; This version  18. Jan 2015
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -904,7 +904,7 @@ a_abort:        ldx #SP0        ; Reset stack pointer
                 stz INPORT
                 stz INPORT+1
 
-z_abort:        jmp l_quit      ; ABORT always flows into quit
+z_abort:        bra l_quit      ; ABORT always flows into quit
 ; -----------------------------------------------------------------------------
 ; QUIT ( -- ) 
 ; Endless interpreter loop. Resets the return stack so it can't be accessed by 
@@ -1584,8 +1584,8 @@ _sloop:         ; from the Length Byte of the header, get the length of
                 cmp (3,x)       ; address of mystery string
                 bne _nomatch
 
-                ; Nope. Time to do it the hard way and compare whole name 
-                ; strings
+                ; Yep, a match. Time to do it the hard way and compare 
+                ; the whole name strings
 
                 ; We don't touch TMPADR because we'll need the link of this
                 ; word later one way or another. Copy it to TMPADR2 with
@@ -3039,8 +3039,7 @@ z_does:         rts
 ; CREATE ( "name" -- ) 
 ; Create entry in dictionary for VARIABLE and others. We ignore all 
 ; alignment issues since this is an 8 bit machine. CREATE is used in its 
-; generic form for variables, and in a slightly different version for word 
-; definitions, controled by the flag CREATE. 
+; generic form for variables, and in a modified form by : (COLON)
 l_create:       bra a_create
                 .byte $06 
                 .word l_does    ; link to DOES>
