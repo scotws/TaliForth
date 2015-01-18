@@ -103,7 +103,7 @@
 
 ; -----------------------------------------------------------------------------
 ; RETURN STACK
-; Packrat uses the 65c02 stack as the Return Stack, from $100 to $1ff. The 
+; Tali Forth uses the 65c02 stack as the Return Stack, from $100 to $1ff. The 
 ; CPU stack pointer is used as the Return Stack Pointer
 .alias  RP0     $FF   ; bottom of return stack (pointer value)
 
