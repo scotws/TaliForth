@@ -354,14 +354,13 @@ _wordonly:      lda (TMPADR1)   ; LSB
                 clc
                 adc CP
                 sta CP
-                lda CP+1
-                adc #$00        ; we only care about the carry
-                sta CP+1
+                bcc +
+                inc CP+1
 
                 ; restore the correct return address. We have already added
                 ; two to the return address, so we just need to push it on 
                 ; the stack
-                lda TMPADR1+1   ; MSB
+*               lda TMPADR1+1   ; MSB
                 pha
                 lda TMPADR1     ; LSB
                 pha 
@@ -1968,22 +1967,21 @@ a_squote:       ; use PARSE to find the end of the string
                 clc 
                 adc #$03
                 sta TMPADR
-                lda CP+1
-                adc #$00
-                sta TMPADR+1
+                bcc +
+                inc TMPADR+1
 
                 ; We'll need to jump to where the string has ended, TMPADR1 
                 ; holds that address
-                lda TMPADR
+*               lda TMPADR
                 clc
                 adc 1,x         ; length of string
                 sta TMPADR1
-                lda TMPADR+1
-                adc #$00        ; MSB of string length is assumed to be zero
-                sta TMPADR1+1
+                bcc +
+                inc TMPADR1+1
 
-                ; Save the JMP instruction
-                ldy #$00
+                ; Save the JMP instruction. This cannot be simplified with
+                ; f_cmpljmp at this point
+*               ldy #$00
                 lda #$4C        ; opcode for JMP
                 sta (CP),y
                 iny
@@ -1999,13 +1997,12 @@ a_squote:       ; use PARSE to find the end of the string
                 clc
                 adc CP
                 sta CP
-                lda CP+1
-                adc #$00        ; we only care about the carry
-                sta CP+1
+                bcc +
+                inc CP+1
 
                 ; copy the string into the dictionary
                 ; save the length of the string for later 
-                lda 1,x
+*               lda 1,x
                 pha 
 
                 dex
