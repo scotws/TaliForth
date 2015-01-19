@@ -22,7 +22,6 @@ Completing all words on this list will trigger BETA status
 === LONGER TERM ===
 
 - use internal version of POSTPONE (l_postpoint) to clean up code
-- use LITERAL (l_lit) to clean up code (compare ['] routine)
 - simplify high-level word definitions
 - check code for use of BIT 
 - See if S" conforms to Gforth usage (doesn't look like it)

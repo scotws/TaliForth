@@ -1,9 +1,8 @@
-; -----------------------------------------------------------------------------
 ; TALI FORTH FOR THE 65C02 
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  18. Jan 2015
+; This version  19. Jan 2015 (one year of coding)
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -282,6 +281,94 @@ _loop:          lda (TMPADR),y
                 rts
 .scend 
 ; -----------------------------------------------------------------------------
+; COMPILE SUBROUTINE JUMP / JUMP / WORD
+; Routines to compile instructions such as "jsr l_words" or "jmp l_words" into a 
+; word that is created by another Forth word. Use either for subroutine jumps
+; 
+;       jsr f_cmpljsr
+;       .word <addr>
+; 
+; which includes the opcode for JSR, or 
+;
+;       jsr f_cmpljmp
+;       .word <addr>
+;
+; which includes the opcode for JMP, or 
+;
+;       jsr f_cmplword
+;       .word <word>
+;
+; which simply adds the word in little-endian format. Used in various places. Note
+; this trades memory savings for a 12 clock cycle overhead because of JSR/RTS
+.scope
+f_cmplword:     lda #$00        ; just compile word in little-endian
+                bra _common
+
+f_cmpljsr:      lda #$20        ; compile "JSR" opcode 
+                bra _common
+
+f_cmpljmp:      lda #$4C        ; compile "JMP" opcode; falls through to _common
+
+                ; opcode doubles as a non-zero flag 
+_common:        sta FLAG  
+
+                ; pull address/word off of stack
+                pla 
+                sta TMPADR1     ; LSB of address
+                pla
+                sta TMPADR1+1   ; MSB of address
+
+                ; increase address by one because of the way the 65c02 handles
+                ; subroutine jumps: Address is the last byte of the JSR instuction,
+                ; not the address itself
+                inc TMPADR1
+                bne +
+                inc TMPADR+1
+
+*               ldy #$00 
+
+                ; see if we're just adding a word
+                lda FLAG
+                beq _wordonly
+
+                ; this is either f_cmpljsr or f_cmpljmp, so we use the opcode 
+                ; that doubled as the flag and save that first 
+                sta (CP),y
+                iny
+                
+                ; continue with common part: compile word 
+_wordonly:      lda (TMPADR1)   ; LSB
+                sta (CP),y
+                iny
+
+                inc TMPADR1
+                bne +
+                inc TMPADR+1
+
+*               lda (TMPADR1)   ; MSB
+                sta (CP),y
+                iny
+
+                ; save new CP
+                tya
+                clc
+                adc CP
+                sta CP
+                lda CP+1
+                adc #$00        ; we only care about the carry
+                sta CP+1
+
+                ; restore the correct return address. We have already added
+                ; two to the return address, so we just need to push it on 
+                ; the stack
+                lda TMPADR1+1   ; MSB
+                pha
+                lda TMPADR1     ; LSB
+                pha 
+
+                rts
+.scend
+; -----------------------------------------------------------------------------
 ; COMPILE/EXECUTE MAIN ROUTINE
 ; This is the core routine called by EVALUTE and QUIT. We process one line 
 ; only. Uses Y and TMPCNT
@@ -340,42 +427,17 @@ _parseword:     ; PARSE-NAME ("text" -- addr u)
                 ora STATE+1
                 beq _parseword  ; interpret, so we're done. Get next word
 
-
-                ; Compile the number as a literal 
-
                 ; TODO We only handle single-cell numbers correctly here 
                 ; Impletement 2LITERAL and (2LITERAL) and change the 
                 ; flags from NUMBER so we can distinguish between single
                 ; and double numbers
-                ldy #$00 
 
-                lda #$20        ; opcode for JSR 
-                sta (CP),y
-                iny
-                lda #<l_plit    ; LSB of xt of (LITERAL)
-                sta (CP),y
-                iny
-                lda #>l_plit    ; MSB of xt of (LITERAL)
-                sta (CP),y
-                iny 
+                ; Compile the number as a literal 
+                jsr f_cmpljsr
+                .word l_plit
 
-                lda 1,x         ; LSB of our number
-                sta (CP),y
-                iny
-                lda 2,x         ; MSB of our number
-                sta (CP),y
-                iny
-
-                ; adjust the CP
-                tya 
-                clc
-                adc CP
-                sta CP 
-                bcc +
-                inc CP+1
-
-*               inx
-                inx
+                ; compile our number
+                jsr l_comma
 
                 ; we're done, get next word
                 bra _parseword
@@ -467,9 +529,10 @@ _compile:       ; Compile. First, see if the Precedence bit is set. If yes,
 
                 jsr l_cmpc
 
-                ; Enough of that. Now get next word
+                ; That's quite enough of this word, let's get the next one
                 jmp _parseword
 
+                ; we're all done on this line
 _doneline:      rts
 .scend
 ; -----------------------------------------------------------------------------
@@ -811,7 +874,8 @@ z_cold:         rts
 ; (LITERAL) ( -- x ) 
 ; Run-time routine for LITERAL: Push value in the two bytes immediately 
 ; following this word on the stack. This is a compile-only word and must 
-; be called by JSR (no native compiling)
+; be called by JSR (no native compiling). Note we can't replace this by
+; f_cmplword because we put things on the stack, not compile them
 l_plit:         bra a_plit
                 .byte CO+$09 
                 .word l_cold    ; link to COLD
@@ -862,26 +926,11 @@ l_lit:          bra a_lit
 .scope
 a_lit:          ldy #$00
 
-                ; we first compile the call to (LITERAL) 
-                lda #$20        ; opcode for the JSR instruction 
-                sta (CP),y
-                iny
-                lda #<l_plit    
-                sta (CP),y
-                iny
-                lda #>l_plit
-                sta (CP),y
-                iny 
-
-                ; bookkeeping: update CP
-                tya
-                clc
-                adc CP
-                sta CP
-                bcc +
-                inc CP+1
+                ; compile the call to (LITERAL) 
+                jsr f_cmpljsr
+                .word l_plit
  
-*               ; now store the number provided on the stack
+                ; now store the number provided on the stack
                 jsr l_comma
 
 z_lit:          rts
@@ -1935,25 +1984,26 @@ a_squote:       ; use PARSE to find the end of the string
 
                 ; Save the JMP instruction
                 ldy #$00
-                lda #$4C        ; JMP opcode
+                lda #$4C        ; opcode for JMP
                 sta (CP),y
                 iny
-                lda TMPADR1     ; LSB of target address
+                lda TMPADR1     ; LSB
                 sta (CP),y
                 iny
-                lda TMPADR1+1   ; MSB of target address
+                lda TMPADR1+1   ; MSB
                 sta (CP),y
-                iny 
+                iny
 
-                ; Move CP up by three
-                clc 
-                lda CP
-                adc #$03
+                ; update CP
+                tya
+                clc
+                adc CP
                 sta CP
-                bcc + 
-                inc CP+1
+                lda CP+1
+                adc #$00        ; we only care about the carry
+                sta CP+1
 
-*               ; copy the string into the dictionary
+                ; copy the string into the dictionary
                 ; save the length of the string for later 
                 lda 1,x
                 pha 
@@ -1978,18 +2028,10 @@ a_squote:       ; use PARSE to find the end of the string
                 inc CP+1
                 
 *               ; compile routine into the dictionary 
-                ldy #$00
+                jsr f_cmpljsr
+                .word l_psquote
 
-                ; compile JSR (S") 
-                lda #$20        ; JSR opcode
-                sta (CP),y
-                iny
-                lda #<l_psquote ; LSB of xt of (S")
-                sta (CP),y
-                iny
-                lda #>l_psquote ; MSB of xt of (S")
-                sta (CP),y
-                iny 
+                ldy #$00
 
                 ; compile addr of string 
                 lda TMPADR
@@ -2110,27 +2152,19 @@ a_dotq:         ; parse the text, looking for the finishing "
                 sta TMPCNT
 
                 ; compile code to call (.")
-                ldy #$00
-                lda #$20                ; opcode for JSR
-                sta (CP),y
-                iny
-                lda #<l_pdotq           ; LSB of xt for (.") 
-                sta (CP),y
-                iny
-                lda #>l_pdotq           ; MSB
-                sta (CP),y
-                iny
+                jsr f_cmpljsr
+                .word l_pdotq
 
                 ; save the length of the string. Note we now have the 
                 ; classic "counted string" (cs-addr) format though we usually 
                 ; try to avoid that
+                ldy #$00
                 lda TMPCNT
                 sta (CP),y
                 iny
 
                 ; adjust CP. We could do this later in one step but this 
                 ; involves less trickery
-                ; TODO decide if we want to be clever after all 
                 tya
                 clc 
                 adc CP
@@ -3001,38 +3035,14 @@ l_does:         bra a_does
                 .byte "DOES>"
 .scope
 a_does:         ; compile a subroutine jump to (DOES>)
-                ldy #$00
-                lda #$20        ; opcode for JSR
-                sta (CP),y
-                iny
-                lda #<l_pdoes   ; LSB of (DOES>)
-                sta (CP),y
-                iny
-                lda #>l_pdoes   ; MSB of (DOES>)
-                sta (CP),y
-                iny
+                jsr f_cmpljsr
+                .word l_pdoes
 
                 ; compile a subroutine jump to DODOES. This is the 
                 ; CFA of the new word
-                lda #$20        ; opcode for JSR
-                sta (CP),y
-                iny
-                lda #<fc_dodoes ; LSB of DODOES
-                sta (CP),y
-                iny
-                lda #>fc_dodoes ; MSB of DODOES
-                sta (CP),y
-                iny
+                jsr f_cmpljsr
+                .word fc_dodoes
 
-                ; update CP 
-                tya
-                clc
-                adc CP
-                sta CP
-                bcc _done
-                inc CP+1 
-
-_done:          
 z_does:         rts
 .scend
 ; -----------------------------------------------------------------------------
@@ -3370,55 +3380,25 @@ pp_found:       ; we start here with (xt f) on the stack, where f will be
                 ; by including   ' <NAME> COMPILE,  
                 ; We already have xt so we just need to make sure it 
                 ; gets put in the code
-                ldy #$00
 
-                ; (LITERAL)
-                lda #$20        ; opcode for JSR
-                sta (CP),y
-                iny
-                lda #<l_plit    ; LSB of xt of (LITERAL)
-                sta (CP),y
-                iny
-                lda #>l_plit    ; MSB
-                sta (CP),y
-                iny
+                ; compile (LITERAL)
+                jsr f_cmpljsr
+                .word l_plit
 
-                ; XT
-                lda 1,x         ; LSB of the xt that we were given  
-                sta (CP),y
-                iny
-                lda 2,x         ; MSB
-                sta (CP),y
-                iny
+                ; compile the xt that we have sitting on the stack. We 
+                ; can't use COMPILE, because that might decide to natively
+                ; compile the xt and ruin everything. 
+                jsr l_comma
 
-                ; COMPILE,
-                lda #$20        ; opcode for JSR
-                sta (CP),y
-                iny
-                lda #<l_cmpc    ; LSB of xt of COMPILE,
-                sta (CP),y
-                iny
-                lda #>l_cmpc    ; MSB of xt of COMPILE,
-                sta (CP),y
-                iny
-
-                ; update CP 
-                tya
-                clc
-                adc CP
-                sta CP
-                bcc _stack 
-                inc CP+1 
-
-_stack:         ; clear stack 
-                inx
-                inx
-
+                ; compile COMPILE,
+                jsr f_cmpljsr
+                .word l_cmpc
+                
                 bra _done
 
 _immediate:     ; The word is immediate, so instead of executing it right now,
                 ; we compile it. xt is on the stack
-                jsr l_cmpc      ; fall through to RTS
+                jmp l_cmpc      ; JSR/RTS
 
 _done: 
 z_postpo:       rts
@@ -3853,7 +3833,7 @@ a_gtbody:       ; lucky for us, a xt is the same as the start address
                 adc #$05
 
                 ; now add offset to address
-                clc             ; PARANOID, should never be required
+                clc             ; paranoid, should never be required
                 adc TMPADR      ; LSB
                 sta 1,x 
                 lda TMPADR+1    ; MSB
@@ -3939,21 +3919,9 @@ l_defer:        bra a_defer
 .scope
 a_defer:        jsr l_create
                 ; ['] ABORT ,  does nothing more but put the xt of ABORT
-                ; in the word. We can do that quicker in assembler. Also, 
-                ; we want more than ABORT, we want an error message. CREATE
-                ; will add DOVAR, we add the xt with a stripped-down version
-                ; of COMMA
-                lda #<e_defer   ; LSB of xt 
-                sta (CP)
-                inc CP
-                bne +
-                inc CP+1 
-
-*               lda #>e_defer   ; MSB of xt
-                sta (CP)
-                inc CP          ; next byte
-                bne _done
-                inc CP+1
+                ; in the word, we can do that quicker
+                jsr f_cmplword
+                .word e_defer
 
 _done:          ; continue with normal Forth word
                 jsr l_pdoes     ; DOES> by hand: added (DOES>) and DODOES
@@ -4145,12 +4113,11 @@ a_move:         ; abort if number of bytes to move is zero
                 ; TODO this is just for testing 
                 rts 
 
-_done:          inx
-                inx
-                inx
-                inx
-                inx 
-                inx
+_done:          ; drop three entries from Data Stack
+                txa
+                clc
+                adc #$06
+                tax
 
 z_move:         rts
 .scend
@@ -4226,12 +4193,10 @@ _innerloop:     dey
 _done:          plx             ; drops through to _abort 
 
 _abort:         ; clear up the stack and leave 
-                inx 
-                inx
-                inx
-                inx
-                inx 
-                inx
+                txa
+                clc
+                adc #$06
+                tax
 
 z_cmovegt:      rts
 .scend
@@ -4295,12 +4260,10 @@ _partial:       lda (TMPADR1),y
 _done:          plx             ; drops through to _abort
  
 _abort:         ; clear the stack  
-                inx  
-                inx
-                inx
-                inx
-                inx 
-                inx
+                txa
+                clc
+                adc #$06
+                tax
 
 z_cmove:        rts
 .scend 
@@ -4500,7 +4463,6 @@ z_erase:        rts
 ; MARKER ( "name" -- )
 ; Create deletion boundry to restore dictionary to earlier state. Note that
 ; old dictionary entries are not erased, but will be overwritten. 
-; HIER HIER 
 l_marker:       bra a_marker
                 .byte IM+$06 
                 .word l_erase   ; link to ERASE
@@ -4911,7 +4873,7 @@ _store:         sta 1,x
 z_0lt:          rts
 .scend
 ; -----------------------------------------------------------------------------
-; 0= (ZERO EQUAL) ( x -- f ) 
+; 0= (ZERO EQUAL) ( n -- f ) 
 ; Return a TRUE flag if and only if TOS is zero
 l_0equ:         bra a_0equ
                 .byte NC+$02 
@@ -6580,11 +6542,10 @@ a_again:        ; Add the JMP absolute command ($4C). We use Y as an index
                 clc
                 adc CP
                 sta CP
-                lda CP+1
-                adc #$00        ; we only care about the carry
-                sta CP+1
+                bcc +
+                inc CP+1
 
-                inx             ; drop the address
+*               inx             ; drop the address
                 inx
 
 z_again:        rts
@@ -6650,9 +6611,10 @@ a_p0branch:     ; we use the return value on the 65c02 stack to determine
 
                 bra _done
 
-_zero:          ; flag is FALSE (0) so we take the jump to the address given in the
-                ; next two bytes. Note that the address on the 65c02 stack points to 
-                ; the last byte of the JSR instruction, not the next byte afterwards
+_zero:          ; flag is FALSE (0) so we take the jump to the address 
+                ; given in the next two bytes. Note that the address on 
+                ; the 65c02 stack points to the last byte of the 
+                ; JSR instruction, not the next byte afterwards
                 ldy #$01        ; not zero
                 lda (TMPADR),y  ; LSB
                 sta TMPADR1
@@ -6680,7 +6642,8 @@ z_p0branch:     rts
 ; Compiles the code required for branching if zero in TOS, which is
 ; (0BRANCH). Note this expects the next two bytes to be the address of 
 ; where to jump to when the test fails. This code must not be natively 
-; compiled because we need the return address provided on the 65c02 stack by JSR
+; compiled because we need the return address provided on the 65c02 stack 
+; by JSR
 l_0branch:      bra a_0branch
                 .byte IM+CO+$07
                 .word l_p0branch    ; link to P0BRANCH
@@ -6688,22 +6651,10 @@ l_0branch:      bra a_0branch
                 .byte "0BRANCH"
 .scope
 a_0branch:      ; encode subroutine jump to (0BRANCH)
-                ldy #$00
+                jsr f_cmpljsr
+                .word a_p0branch
 
-                lda #$20                ; JSR opcode
-                sta (CP),y
-                iny
-                lda #<a_p0branch        ; LSB of (0BRANCH) first
-                sta (CP),y
-                iny
-                lda #>a_p0branch        ; MSB
-                sta (CP),y
-                iny
-
-                ; jump to (BRANCH) to adjust the CP
-                jmp branchcp
-
-z_0branch:      rts             ; never reached
+z_0branch:      rts
 .scend
 ; ----------------------------------------------------------------------------
 ; PBRANCH ( -- ) "(BRANCH)"
@@ -6721,8 +6672,9 @@ a_pbranch:      ; we use the return value on the 65c02 stack to determine
                 pla             ; MSB
                 sta TMPADR+1
 
-                ; Note that the address on the 65c02 stack points to the last byte 
-                ; of the JSR instruction, not the next byte afterwards
+                ; Note that the address on the 65c02 stack points to the 
+                ; last byte of the JSR instruction, not the next byte 
+                ; afterwards
                 ldy #$01        ; not zero
                 lda (TMPADR),y  ; LSB
                 sta TMPADR1
@@ -6730,8 +6682,8 @@ a_pbranch:      ; we use the return value on the 65c02 stack to determine
                 lda (TMPADR),y  ; MSB
                 sta TMPADR1+1
 
-                ; We have to subtract one byte from the address given because 
-                ; of the effect of RTS
+                ; We have to subtract one byte from the address 
+                ; given because of the effect of RTS
                 lda TMPADR1
                 bne +
                 dec TMPADR1+1
@@ -6756,26 +6708,9 @@ l_branch:       bra a_branch
                 .byte "BRANCH"
 .scope
 a_branch:       ; encode subroutine jump to (BRANCH)
-                ldy #$00
+                jsr f_cmpljsr
+                .word a_pbranch
 
-                lda #$20               ; JSR opcode
-                sta (CP),y
-                iny
-                lda #<a_pbranch        ; LSB of (BRANCH) first
-                sta (CP),y
-                iny
-                lda #>a_pbranch        ; MSB 
-                sta (CP),y
-                iny
-
-branchcp:       ; adjust CP. This part is also called by 0BRANCH
-                tya
-                clc
-                adc CP
-                sta CP
-                bcc _done 
-                inc CP+1
-_done:
 z_branch:       rts 
 .scend
 ; -----------------------------------------------------------------------------
@@ -6810,7 +6745,7 @@ a_false:        dex
 
 z_false:        rts
 ; -----------------------------------------------------------------------------
-; ONEPLUS ( x -- x ) ("1+")
+; ONEPLUS ( n -- n ) ("1+")
 ; Add one to number on top of the parameter stack 
 l_1plus:        bra a_1plus
                 .byte NC+$02 
@@ -6827,7 +6762,7 @@ _done:
 z_1plus:        rts
 .scend
 ; -----------------------------------------------------------------------------
-; ONEMINUS ( x -- x ) ("1-")
+; ONEMINUS ( n -- n ) ("1-")
 ; Subtract one from number on top of the parameter stack 
 l_1minus:       bra a_1minus
                 .byte NC+$02 
@@ -6873,7 +6808,8 @@ z_depth:        rts
 ; PICK ( n n u -- n n n ) 
 ; Take the u-th element out of the stack and put it on TOS, overwriting the 
 ; current TOS. 0 PICK is equivalent to DUP, 1 PICK to OVER. Note that 
-; using PICK is considered poor coding form.
+; using PICK is considered poor coding form. Also note that FIG Forth has 
+; a different behavior for PICK than ANS Forth. 
 ; TODO use DEPTH to check for underflow 
 l_pick:         bra a_pick
                 .byte NC+$04 
@@ -6970,6 +6906,7 @@ a_nip:          lda 1,x         ; LSB
                 sta 3,x
                 lda 2,x         ; MSB
                 sta 4,x
+
                 inx
                 inx
 
@@ -7122,7 +7059,6 @@ l_2over:        bra a_2over
                 .byte "2OVER"
 .scope
 a_2over:        ; TODO see if we have enough stuff on the stack 
-
                 dex
                 dex
                 dex
@@ -7150,6 +7086,7 @@ l_over:         bra a_over
 
 a_over:         dex
                 dex
+
                 lda 5,x         ; LSB
                 sta 1,x
                 lda 6,x         ; MSB
@@ -7157,10 +7094,10 @@ a_over:         dex
 
 z_over:         rts
 ; -----------------------------------------------------------------------------
-; R FETCH  ( -- x ) (R: x -- x) ("R@")
+; R FETCH  ( -- n ) (R: n -- n) ("R@")
 ; Copy (not: move) x from Return Stack to Parameter Stack
 ; Remember we have to move the return address from the subroutine call 
-; out of the way. We follow gForth in that this is not a compile-only word,
+; out of the way. We follow Gforth in that this is not a compile-only word,
 ; though the ANS Forth standard leaves the interpretation "undefined". This
 ; should not be natively compiled for that reason. 
 l_rfetch:       bra a_rfetch
@@ -7198,7 +7135,7 @@ a_rfetch:       dex
 
 z_rfetch:       rts
 ; -----------------------------------------------------------------------------
-; FROM R ( -- x ) (R: x -- ) ("R>") 
+; FROM R ( -- n ) (R: n -- ) ("R>") 
 ; Move x from Return Stack to Parameter Stack. Remember we have to move 
 ; the jump address out of the way first. This is a compile-only word
 l_fromr:        bra a_fromr
@@ -7230,7 +7167,7 @@ a_fromr:        dex
                 
 z_fromr:        rts
 ; -----------------------------------------------------------------------------
-; TO R ( x -- ) (R: -- x ) (">R")
+; TO R ( n -- ) (R: -- n ) (">R")
 ; Move x to the Return Stack. Note that the Parameter (Data) Stack and the 
 ; Return Stack both have the LSB on top. Remember that we have to move the 
 ; original value off the stack to make the return jump work
@@ -7488,7 +7425,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version ALPHA 004 (17. Jan 2015)",0
+fs_version:    .byte "Version ALPHA 004 (19. Jan 2015)",0
 fs_disclaim:   .byte "Tali Forth comes with absolutely NO WARRANTY",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0
