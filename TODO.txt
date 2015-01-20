@@ -1,6 +1,6 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 17. Jan 2015
+This version: 20. Jan 2015
 
 === SHORT TERM === 
 

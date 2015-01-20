@@ -2,7 +2,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  19. Jan 2015 (one year of coding)
+; This version  20. Jan 2015 
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -312,20 +312,17 @@ f_cmpljmp:      lda #$4C        ; compile "JMP" opcode; falls through to _common
                 ; opcode doubles as a non-zero flag 
 _common:        sta FLAG  
 
-                ; pull address/word off of stack
-                pla 
-                sta TMPADR1     ; LSB of address
-                pla
-                sta TMPADR1+1   ; MSB of address
-
-                ; increase address by one because of the way the 65c02 handles
-                ; subroutine jumps: Address is the last byte of the JSR instuction,
-                ; not the address itself
-                inc TMPADR1
+                ; pull address/word off of stack, increase by one because of
+                ; the way the 65c02 handles subroutines
+                ply             ; LSB of address
+                pla             ; MSB of address 
+                iny
                 bne +
-                inc TMPADR+1
+                inc 
+*               sty TMPADR1     ; LSB
+                sta TMPADR1+1   ; MSB
 
-*               ldy #$00 
+                ldy #$00 
 
                 ; see if we're just adding a word
                 lda FLAG
@@ -756,20 +753,18 @@ fc_docon:       ; value is stored in the two bytes after the JSR
 ; pick the address of the calling variable off the 65c02's stack. The final
 ; RTS takes us to the original caller. 
 .scope
-fc_dovar:       ; pull return address off of the machine's stack
-                pla             ; LSB of return address
-                sta TMPADR2
-                pla             ; MSB of return address
-                sta TMPADR2+1
-
-                ; On the 65c02, the address for RTS is actually the third
-                ; byte of the JSR command, so we add one byte
-                inc TMPADR2
+fc_dovar:       ; pull return address off of the machine's stack, adding one
+                ; because of the way the 65c02 handles subroutines
+                ply             ; LSB
+                pla             ; MSB
+                iny
                 bne +
-                inc TMPADR2+1
+                inc
+*               sty TMPADR2     ; LSB
+                sta TMPADR2+1   ; MSB
 
                 ; get variable and push it on the stack 
-*               dex
+                dex
                 dex
 
                 lda TMPADR2     ; LSB
@@ -787,20 +782,19 @@ fc_dovar:       ; pull return address off of the machine's stack
 fc_dodoes:      ; Assumes the address of the CFA of the original defining word
                 ; is on the top of the stack (for instance, CONSTANT). Save 
                 ; it for a jump later. We have to add one byte because of the
-                ; way that JSR stores the return address for RTS
-                pla
-                sta TMPADR2
-                pla
-                sta TMPADR2+1 
-
-                inc TMPADR2
+                ; way that the 65c02 handles subroutines
+                ply             ; LSB
+                pla             ; MSB
+                iny
                 bne +
-                inc TMPADR2+1
+                inc
+*               sty TMPADR2     ; LSB
+                sta TMPADR2+1   ; MSB
 
                 ; Next on the stack should be the address of the PFA of 
                 ; the calling defined word, say the name of the constant
                 ; we just defined. Push this on the Data Stack.
-*               dex
+                dex
                 dex
 
                 pla 
@@ -885,18 +879,17 @@ a_plit:         ; make room on stack
                 dex
                 dex
 
-                pla             ; LSB of return address
-                sta TMPADR
+                ; get the value after the command
+                ply             ; LSB
                 pla             ; MSB
+                iny
+                bne +
+                inc
+*               sty TMPADR      ; LSB
                 sta TMPADR+1
 
-                ; move up one address so we are pointing to the byte after
-                ; the JSR command. 
-                inc TMPADR
-                bne +
-                inc TMPADR+1
 
-*               ; get bytes after JSR address
+                ; get bytes after JSR address
                 lda (TMPADR)    ; LSB
                 sta 1,x
                 inc TMPADR
@@ -1889,19 +1882,17 @@ a_psquote:      ; make space on stack
                 dex
 
                 ; use return address from JSR call to find the start of the
-                ; (addr u) stored
-                pla             ; LSB of return address
-                sta TMPADR
-                pla
-                sta TMPADR+1
-
-                ; move up one address so we are pointing to the byte after
-                ; the JSR command. This is where the addr is saved 
-                inc TMPADR
+                ; (addr u) stored. Note we have to add one because of the way
+                ; the 65c02 stores RTS addresses
+                ply             ; LSB
+                pla             ; MSB
+                iny
                 bne +
-                inc TMPADR+1
+                inc
+*               sty TMPADR      ; LSB 
+                sta TMPADR+1    ; MSB
 
-*               ; get addr of string and push on stack
+                ; get addr of string and push on stack
                 ldy #$00
 
                 lda (TMPADR),y
@@ -2069,19 +2060,15 @@ l_pdotq:        bra a_pdotq
 .scope
 a_pdotq:        ; use return address from JSR call to find the start of the
                 ; string 
-                pla             ; LSB of return address
-                sta TMPADR
-                pla             ; MSB
+                ply
+                pla
+                iny
+                bne +
+                inc
+*               sty TMPADR
                 sta TMPADR+1
 
-                ; move up one address so we are pointing to the byte after
-                ; the JSR command. This is where the length of the following
-                ; string is stored in one byte (not: one word) 
-                inc TMPADR
-                bne +
-                inc TMPADR+1
-
-*               ; get length of string. If it is zero, we just return 
+                ; get length of string. If it is zero, we just return 
                 lda (TMPADR)
                 beq _done
 
