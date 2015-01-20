@@ -1042,12 +1042,67 @@ _clrstack:      ; drop the address and number of characters that PARSE-NAME
 
 z_quit:         rts     ; never reached; required for native compile
 .scend
+
+
+; ----------------------------------------------------------------------------
+; ABORTQ ( "message" -- ) ("ABORT"") 
+; If TOP is TRUE, print a message and abort. This is a compile-only word
+; One way to create this in Forth is CamelForth's 
+;   : ?ABORT ( f addr u )  ROT IF TYPE ABORT THEN 2DROP ;
+;   : ABORT" ( "msg" -- )  [COMPILE] S" ['] ?ABORT COMPILE, ;
+l_abortq:       bra a_abortq
+                .byte CO+IM+$06 
+                .word l_quit    ; link to QUIT 
+                .word z_abortq
+                .byte "ABORT", $22
+.scope
+a_abortq:       ; parse message and save the address and length
+                ; adds them to Dictionary and will push them to the Data Stack
+                ; when run (S") 
+                jsr l_squote 
+
+                ; compile runtime component
+                jsr f_cmpljsr
+                .word l_pabortq
+
+z_abortq:       rts
+.scend
+; ----------------------------------------------------------------------------
+; PABORTQ ( f -- )   ("(ABORT")")
+; Runtime component of ABORT". If flag on Data Stack is true, print message and
+; abort
+l_pabortq:      bra a_pabortq
+                .byte $08 
+                .word l_abortq    ; link to ABORTQ
+                .word z_pabortq
+                .byte "(ABORT", $22, ")"
+
+.scope
+a_pabortq:      ; we started out with a flag on the Data Stack, but the first part
+                ; of the word compiled by ABORT" pushed (addr u) on as well, so 
+                ; our flag is on third place
+                lda 5,x         ; third entry on Data Stack 
+                ora 6,x
+                beq _done
+
+                jsr l_type
+                jmp l_abort     ; don't need a JSR because we nuke the stacks
+
+_done:          ; ABORT not called, drop the top three top entries on the Data
+                ; stack 
+                txa
+                clc
+                adc #$06
+                tax
+
+z_pabortq:      rts
+.scend
 ; -----------------------------------------------------------------------------
 ; DUMP ( addr u -- ) 
 ; Print u bytes of memory starting at addr in a pretty way
 l_dump:         bra a_dump
                 .byte $04 
-                .word l_quit    ; link to QUIT 
+                .word l_pabortq    ; link to PABORTQ
                 .word z_dump
                 .byte "DUMP"
 .scope 
@@ -1865,72 +1920,13 @@ _done:
 z_dotpar:       rts
 .scend
 ; ----------------------------------------------------------------------------
-; PSQUOTE ( -- addr u ) - (S") - 
-; Internal routine to realize .S strings. Compile-only and must be called by 
-; JSR (never native compile). The user shouldn't call this at all, but we include 
-; it in case he wants to replace this with his own version
-l_psquote:      bra a_psquote
-                .byte CO+$04 
-                .word l_dotpar     ; link to DOTPAR
-                .word z_psquote
-                .byte "(S", $22, ")"
-.scope
-a_psquote:      ; make space on stack
-                dex
-                dex
-                dex
-                dex
-
-                ; use return address from JSR call to find the start of the
-                ; (addr u) stored. Note we have to add one because of the way
-                ; the 65c02 stores RTS addresses
-                ply             ; LSB
-                pla             ; MSB
-                iny
-                bne +
-                inc
-*               sty TMPADR      ; LSB 
-                sta TMPADR+1    ; MSB
-
-                ; get addr of string and push on stack
-                ldy #$00
-
-                lda (TMPADR),y
-                sta 3,x         ; LSB of addr
-                iny
-                lda (TMPADR),y
-                sta 4,x         ; MSB
-                iny
-
-                ; get u of string and push on stack
-                lda (TMPADR),y
-                sta 1,x         ; LSB of u
-                iny
-                lda (TMPADR),y
-                sta 2,x         ; MSB of u, should be zero 
-
-                ; adjust return address
-                tya
-                clc
-                adc TMPADR
-                sta TMPADR
-                bcc _done
-                inc TMPADR+1
-
-_done:          lda TMPADR+1
-                pha             ; MSB first 
-                lda TMPADR
-                pha             ; LSB 
-
-z_psquote:      rts
-.scend
-; ----------------------------------------------------------------------------
 ; SQUOTE  ( "string" -- )  - S" - 
 ; Store the string delimited by " in memory and return the (addr u) pair. 
-; This is a compile-only word. 
+; The ANS Forth CORE word set defines this as a compile-only word, but the
+; FILE set expands it to the interpreted. This makes it a state-sensitive word. 
 l_squote:       bra a_squote
-                .byte IM+CO+$02 
-                .word l_psquote    ; link to PSQUOTE
+                .byte IM+$02       ; not a compile-only word
+                .word l_dotpar     ; link to DOTPAR
                 .word z_squote
                 .byte "S", $22     ; results in S"
 .scope
@@ -1947,103 +1943,118 @@ a_squote:       ; use PARSE to find the end of the string
                 lda 1,x
                 ora 2,x
                 bne +
-                jmp _done       ; too far for BRA 
+
+                inx             ; drop garbage from PARSE
+                inx
+                inx
+                inx
                 
-*               ; We jump over the string to where the actual code
-                ; starts. TMPADR holds be beginning of where the string
-                ; will be in the dictionary. We skip three bytes for the
-                ; JMP command 
-                lda CP
+                bra _done 
+                
+*               ; if this is being compiled, we have to jump over the string that
+                ; we're going to save in memory so we don't slam into it 
+                lda STATE
+                beq _savestring
 
-                clc 
-                adc #$03
-                sta TMPADR
-                bcc +
-                inc TMPADR+1
+                ; this is compiled, add JMP 
+                ldy #$00
 
-                ; We'll need to jump to where the string has ended, TMPADR1 
-                ; holds that address
-*               lda TMPADR
+                lda #$4c        ; opcode for jump, BRA could be too short
+                sta (CP),y
+                iny
+
+                ; the destination of this jump is the CP plus the length of the
+                ; string (in LSB of TOS) plus three bytes for the length of 
+                ; the jmp instruction we're putting before the string. We'll use
+                ; TMPADR2 for the calcultions
+                lda CP+1
+                sta TMPADR2+1
+                lda CP          ; note first byte is already JMP opcode
+
+                ; add three bytes for jump
                 clc
-                adc 1,x         ; length of string
-                sta TMPADR1
+                adc #$03
                 bcc +
-                inc TMPADR1+1
+                inc TMPADR2+1
 
-                ; Save the JMP instruction. This cannot be simplified with
-                ; f_cmpljmp at this point
-*               ldy #$00
-                lda #$4C        ; opcode for JMP
-                sta (CP),y
+                ; add length of string
+*               clc
+                adc 1,x 
+                bcc +
+                inc TMPADR2+1
+
+                ; we now have the MSB of the target address in TMPADR2+1 and the 
+                ; LSB in A. 
+*               sta (CP),y      ; LSB
                 iny
-                lda TMPADR1     ; LSB
-                sta (CP),y
-                iny
-                lda TMPADR1+1   ; MSB
+                lda TMPADR2+1   ; MSB 
                 sta (CP),y
                 iny
 
-                ; update CP
+                ; adjust CP like nothing ever happened
                 tya
                 clc
                 adc CP
                 sta CP
-                bcc +
+                bcc _savestring
                 inc CP+1
+                
+                ; common step is to save the string in the dictionary
+                ; for safekeeping. We do this regardless of if this is 
+                ; compiled or interpreted. ANS only requires the PAD, but
+                ; we love our strings
 
-                ; copy the string into the dictionary
-                ; save the length of the string for later 
-*               lda 1,x
-                pha 
+                ; the source address is in NOS. Save that to TMPADR
+_savestring:    lda 3,x
+                sta TMPADR
+                lda 4,x
+                sta TMPADR+1
 
-                dex
-                dex
-                lda TMPADR
-                sta 1,x
-                lda TMPADR+1
-                sta 2,x         ; now (addr u dict) 
+                ; we still have the length of the string in the lower byte of 
+                ; TOS. Note we only deal with strings >$FF for the moment
+                ; so we ignore the MSB of TOS
+                ldy 1,x         ; LSB of TOS
+*               lda (TMPADR),y
+                sta (CP),y 
+                dey
+                bpl - 
 
-                jsr l_swap      ; now (addr dict u) 
-                jsr l_cmove     ; empties stack, now () 
+                ; The old CP is the first byte of the string, so we put that
+                ; on NOS, replacing the buffer's address. The length, TOS, 
+                ; stays the same
+                lda CP          ; LSB
+                sta 3,x
+                lda CP+1
+                sta 4,x         ; MSB
 
-                ; increase CP by length of the string 
-                pla 
-                pha             ; save length again 
+                ; now we have to move the CP by the length of the string, which
+                ; is in the LSB of the TOS. Note again max string length is $FF
+                ; bytes
+                lda 1,x         ; LSB
                 clc
                 adc CP
                 sta CP
                 bcc +
                 inc CP+1
-                
-*               ; compile routine into the dictionary 
+
+                ; what happens now depends on the state: if we are in compile mode,
+                ; we have more to do, if not, we're done because the address and
+                ; length of the string are on the stack already.
+*               lda STATE       ; cheat by only looking at the LSB
+                beq _done       ; if 0, we're interpreting and everything is done
+
+_compile:       ; This is compiling, so we push these in the dictionary so they
+                ; pop up when the routine is called. We have ( addr u ) 
+                jsr l_swap      ; ( u addr ) 
+
                 jsr f_cmpljsr
-                .word l_psquote
+                .word l_plit    ; compile (LITERAL) 
+                jsr l_comma     ; compile address, now (u) 
+                
+                jsr f_cmpljsr
+                .word l_plit    ; compile (LITERAL) 
+                jsr l_comma     ; compile length, now ( -- ) 
 
-                ldy #$00
-
-                ; compile addr of string 
-                lda TMPADR
-                sta (CP),y
-                iny
-                lda TMPADR+1
-                sta (CP),y
-                iny
-
-                ; compile length u 
-                pla 
-                sta (CP),y
-                iny
-                lda #$00        ; STZ does not have mode for (CP),Y
-                sta (CP),y
-                iny
-
-                ; adjust the CP
-                tya 
-                clc
-                adc CP
-                sta CP 
-                bcc _done
-                inc CP+1
 _done:          
 z_squote:       rts
 .scend
@@ -2113,6 +2124,7 @@ z_pdotq:        rts
 ; Print string enclosed by quotes. ANS Forth wants this to be compile-only,
 ; so we follow that lead though lots of other Forths will always print 
 ; the string. Calls (.") (l_pdotq) for the hard work.
+; TODO S" has a more modern approach, see if we can share code there
 l_dotq:         bra a_dotq
                 .byte IM+CO+$02 
                 .word l_pdotq           ; link to PDOTQ
@@ -3303,8 +3315,7 @@ l_postpo_int:   ; This is the internal version of POSTPONE that lets us use
                 ; xt of the word we want to postpone AFTER the call:
                 ; 
                 ;       jsr l_postpo_int
-                ;       .byte <a_TARGETWORD
-                ;       .byte >a_TARGETWORD
+                ;       .word <l_targetword>
                 ; 
                 ; The stack is not changed. 
 .scope 
@@ -7409,7 +7420,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version ALPHA 004 (19. Jan 2015)",0
+fs_version:    .byte "Version ALPHA 004 (20. Jan 2015)",0
 fs_disclaim:   .byte "Tali Forth comes with absolutely NO WARRANTY",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0

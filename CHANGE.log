@@ -4,6 +4,7 @@ First version: 19. Jan 2014
 
 Add changes to top with date. Note these are only major milestones and versions.
 
+20. Jan 2015: Added ABORT", complete rewrite of S"
 19. Jan 2015: Added f_cmpljsr and friends, converted code to their use
 17. Jan 2015: Added DEFER, DEFER!, DEFER@, IS, ACTION-OF; >BODY now works
 14. Jan 2015: Major rewrite of CREATE, DOVAR, DOES; adds DODOES

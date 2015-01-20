@@ -10,7 +10,6 @@ List of words that still need to be coded
 2>R (SWAP >R >R)
 2R> (R> R> SWAP)
 2R@ (R> R> 2DUP >R >R SWAP)
-ABORT" 
 LEAVE 
 MOVE 
 NEXTNAME (not ANSI, from gforth) 
@@ -19,9 +18,11 @@ WORD
 
 Completing all words on this list will trigger BETA status
 
+
 === LONGER TERM ===
 
-- use internal version of POSTPONE (l_postpoint) to clean up code
+- use internal version of POSTPONE (l_postpo_int) to clean up code
 - simplify high-level word definitions
+- see if we can do without (..) helper functions of words
 - check code for use of BIT 
-- See if S" conforms to Gforth usage (doesn't look like it)
+- rewrite ." for more efficient code
