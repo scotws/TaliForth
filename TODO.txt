@@ -1,6 +1,6 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 20. Jan 2015
+This version: 21. Jan 2015
 
 === SHORT TERM === 
 
@@ -23,6 +23,6 @@ Completing all words on this list will trigger BETA status
 
 - use internal version of POSTPONE (l_postpo_int) to clean up code
 - simplify high-level word definitions
-- see if we can do without (..) helper functions of words
+- see if we can do without the various "(..)" helper functions of words
 - check code for use of BIT 
-- rewrite ." for more efficient code
+- unroll macros for better readability of text

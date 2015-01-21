@@ -1,7 +1,7 @@
 README for Tali Forth for the 65c02 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 19. Jan 2014
-This version:  16. Jan 2015
+This version:  21. Jan 2015
 
 
 This is the README.txt version released with Tali Forth ALPHA 004. Note that this is an ALPHA release of an incomplete program. See the .ods spreadsheet for a list of supported instructions, or type WORDS once Tali Forth is running. Tali Forth is hosted at GitHub, you can find the most current version at 
