@@ -2,7 +2,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  20. Jan 2015 
+; This version  21. Jan 2015 
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -2059,143 +2059,23 @@ _done:
 z_squote:       rts
 .scend
 ; ----------------------------------------------------------------------------
-; PDOTQ ( -- ) (.") 
-; Internal routine to realize ." strings. Compile-only and must be called by 
-; JSR (never native compile). The user shouldn't call this, but we expose it 
-; in case she wants to replace it with her own version
-l_pdotq:        bra a_pdotq
-                .byte CO+$04 
-                .word l_squote      ; link to SQUOTE
-                .word z_pdotq
-                .byte "(.", $22, ")"
-.scope
-a_pdotq:        ; use return address from JSR call to find the start of the
-                ; string 
-                ply
-                pla
-                iny
-                bne +
-                inc
-*               sty TMPADR
-                sta TMPADR+1
-
-                ; get length of string. If it is zero, we just return 
-                lda (TMPADR)
-                beq _done
-
-                sta TMPCNT
-
-                ; move one byte ahead to give us first char of string
-                inc TMPADR
-                bne _print 
-
-                inc TMPADR+1
-
-_print:         ; print the string. At the end, we are pointing to the
-                ; last character of the string 
-                ldy #$00 
-
-_loop:          lda (TMPADR),y
-                jsr f_putchr
-                iny
-                cpy TMPCNT
-                bne _loop
-
-                ; adjust return address
-                dey
-                tya
-                clc
-                adc TMPADR
-                sta TMPADR
-                bcc _done
-                inc TMPADR+1
- 
-_done:          ; put a new return address on the stack that takes us
-                ; behind the string 
-                lda TMPADR+1            ; MSB first 
-                pha
-                lda TMPADR
-                pha 
-
-z_pdotq:        rts
-.scend
-; ----------------------------------------------------------------------------
 ; DOTQUOTE ( "text" -- ) (.") 
 ; Print string enclosed by quotes. ANS Forth wants this to be compile-only,
 ; so we follow that lead though lots of other Forths will always print 
-; the string. Calls (.") (l_pdotq) for the hard work.
-; TODO S" has a more modern approach, see if we can share code there
+; the string. We just call S" and add a TYPE jump routine to save space.
+; Note for printing in interpreted mode, .( is the better choice these 
+; days
 l_dotq:         bra a_dotq
                 .byte IM+CO+$02 
-                .word l_pdotq           ; link to PDOTQ
+                .word l_squote      ; link to SQUOTE
                 .word z_dotq
                 .byte ".", $22          ; results in ." 
 .scope
-a_dotq:         ; parse the text, looking for the finishing "
-                dex
-                dex
-                lda #$22                ; ASCII for " 
-                sta 1,x
-                stz 2,x                 ; always zero 
-
-                jsr l_parse             ; returns ( addr u ) 
-
-                ; if the string length is zero, we don't compile anything
-                lda 1,x                 ; we ignore MSB
-                beq _done 
-
-                ; save length of string for later  
-                sta TMPCNT
-
-                ; compile code to call (.")
+a_dotq:         ; we let S" do the heavy lifting
+                jsr l_squote 
+                ; now we just add TYPE
                 jsr f_cmpljsr
-                .word l_pdotq
-
-                ; save the length of the string. Note we now have the 
-                ; classic "counted string" (cs-addr) format though we usually 
-                ; try to avoid that
-                ldy #$00
-                lda TMPCNT
-                sta (CP),y
-                iny
-
-                ; adjust CP. We could do this later in one step but this 
-                ; involves less trickery
-                tya
-                clc 
-                adc CP
-                sta CP
-                bcc +
-                inc CP+1
-
-*               ; now save the string itself. We know it can't be zero
-                ; because we checked earlier
-                lda 3,x         ; LSB of strings current address in buffer
-                sta TMPADR
-                lda 4,x         ; MSB
-                sta TMPADR+1
-
-                ldy #$00
-
-_loop:          lda (TMPADR),y
-                sta (CP),y
-                iny
-                dec TMPCNT
-                bne _loop
-
-                ; Increase CP (again). Y contains the length of the string
-                tya
-                clc
-                adc CP
-                sta CP
-                bcc _done
-                inc CP+1
-
-_done:          ; dump PARSE's return values off the stack 
-                inx
-                inx
-                inx
-                inx 
+                .word l_type
 
 z_dotq:         rts
 .scend
@@ -7420,7 +7300,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version ALPHA 004 (20. Jan 2015)",0
+fs_version:    .byte "Version ALPHA 004 (21. Jan 2015)",0
 fs_disclaim:   .byte "Tali Forth comes with absolutely NO WARRANTY",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0
