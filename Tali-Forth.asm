@@ -2,7 +2,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  21. Jan 2015 
+; This version  22. Jan 2015 
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -252,8 +252,7 @@ f_toupper:
                 cmp #'z+1
                 bcs _done       ; not lower case, too high
 
-                sec
-                sbc #$20        ; offset to upper case 
+                adc #$e0        ; offset to upper case (wraps)
 
 _done:          rts             ; we're good (finally)
 .scend 
@@ -262,15 +261,13 @@ _done:          rts             ; we're good (finally)
 ; Assumes that string is on stack as ( addr u ) and converts it in place. 
 ; Calls f_toupper, destroys A, Y and changes TMPCNT, TMPADR and TMPADR1
 .scope
-f_strtoupper:
-                lda 1,x         ; LSB of u, we ignore MSB 
-                sta TMPCNT
-                lda 3,x         ; LSB of addr
+f_strtoupper:   lda 3,x         ; LSB of addr
                 sta TMPADR
                 lda 4,x         ; MSB of addr
                 sta TMPADR+1
 
-                ldy TMPCNT
+                ldy 1,x         ; LSB of u, we ignore MSB
+                dey             ; adjust length 
 
 _loop:          lda (TMPADR),y
                 jsr f_toupper
@@ -515,7 +512,7 @@ _compile:       ; Compile. First, see if the Precedence bit is set. If yes,
                 ; it's an immediate word and we execute it even though 
                 ; we're in compile mode. 
                 lda 1,x
-                cmp #$01
+                dec                     ; is A = $01?
                 beq _execute
 
                 ; Call COMPILE, and let it do the hard work. First though
@@ -556,16 +553,15 @@ f_byte2hexasc:
 ; -----------------------------------------------------------------------------
 ; Convert lower nibble of A to ASCII hex number equivalent and print it via
 ; f_putchr. Called by f_byte2hexasc
-f_nib2asc:
 .scope
-                phx
+f_nib2asc:
                 and #$0F        
-                tax
-                lda hexstr,x
-                jsr f_putchr
-                plx
+                ora #'0
+                cmp #'9+1
+                bcc +
+                adc #$06
 
-                rts
+*               jmp f_putchr    ; JSR/RTS
 .scend
 ; -----------------------------------------------------------------------------
 ; OUTPUT CHARACTER TO CURRENT PORT. This is a general routine used by 
@@ -578,28 +574,25 @@ f_putchr:       phy
                 bne _c1
 
                 ; PORT 0: DEFAULT, Terminal, ASCI 
-                jsr k_wrtchr
-                bra _done
+                ply
+                jmp k_wrtchr    ; JSR/RTS
 
-_c1:            cpy #$01
+_c1:            dey
                 bne _c2
 
                 ; PORT 1: VIA Port A output
-                jsr k_wrtchrVIAa
-                bra _done
+                ply
+                jmp k_wrtchrVIAa        ; JSR/RTS
 
-_c2:            cpy #$02
+_c2:            dey
                 bne _err
 
                 ; PORT 2: VIA Port B output
-                jsr k_wrtchrVIAb
-                bra _done
+                ply
+                jmp k_wrtchrVIAb        ; JSR/RTS
 
 _err:           lda #$08        ; string code for unknown channel 
                 jmp error
-
-_done:          ply
-                rts
 .scend
 ; -----------------------------------------------------------------------------
 ; PRINT ZERO-TERMINATED STRING TO CURRENT PORT. Used internally to print
@@ -608,25 +601,20 @@ _done:          ply
 .scope
 f_wrtzerostr:   ; version without a final linefeed
                 ldy #$00 
-                phy 
                 bra _common 
 
 f_prtzerostr:   ; version with a final linefeed
                 ldy #$FF 
-                phy
-
-_common:        phx             ; use X as indext to table
+_common:        phy
 
                 asl
-                tax
-                lda strtbl,x
+                tay
+                lda strtbl,y
                 sta TBLLOC
-                inx
-                lda strtbl,x
+                iny
+                lda strtbl,y
                 sta TBLLOC+1
 
-                plx
-                        
                 ldy #$00
 *               lda (TBLLOC),y
                 beq _linefeed
@@ -635,12 +623,9 @@ _common:        phx             ; use X as indext to table
                 bra -
                 
 _linefeed:      ; get flag to see if we print a final linefeed or not 
-                ply 
-                beq _done 
-
-                ; print a line feed
                 lda #AscLF
-                jsr f_putchr
+                ply
+                bne f_putchr    ; JSR/RTS
 
 _done:          rts
 .scend
@@ -655,28 +640,25 @@ f_getchr:       phy
                 bne _c1
 
                 ; PORT 0: DEFAULT, Terminal, ASCI 
-                jsr k_getchr
-                bra _done
+                ply
+                jmp k_getchr    ; JSR/RTS
 
-_c1:            cpy #$01
+_c1:            dey             ; if 1 this turns to 0
                 bne _c2
 
                 ; PORT 1: VIA Port A input
-                jsr k_getchrVIAa
-                bra _done
+                ply
+                jmp k_getchrVIAa        ; JSR/RTS
 
-_c2:            cpy #$02
+_c2:            dey
                 bne _err
 
                 ; PORT 2: VIA Port B input
-                jsr k_getchrVIAb
-                bra _done
+                ply
+                jmp k_getchrVIAb        ; JSR/RTS
 
 _err:           lda #$08        ; string code for wrong channel
-                jmp error
-
-_done:          ply
-                rts
+                jmp error       ; JSR/RTS
 .scend
 ; -----------------------------------------------------------------------------
 ; COMPARE TOS/NOS and return results in form of the 65c02 flags
@@ -702,7 +684,7 @@ f_cmp16:        ; compare LSB. We do this first to set the Carry Flag
                 sbc 4,x         ; MSB of NOS 
                 ora #$01        ; Make Zero Flag 0 because we're not equal
                 bvs _overflow 
-                bra _done
+                bra _notequal
 
 _equal:         ; low bytes are equal, so we compare high bytes
                 lda 2,x         ; MSB of TOS
@@ -711,7 +693,8 @@ _equal:         ; low bytes are equal, so we compare high bytes
 
 _overflow:      ; handle overflow because we use signed numbers
                 eor #$80        ; complement negative flag
-                ora #$01        ; if overflow, we can't be equal 
+
+_notequal:      ora #$01        ; if overflow, we can't be equal 
 
 _done:          rts 
 .scend 
@@ -958,10 +941,10 @@ l_quit:         bra a_quit
                 .byte "QUIT"
 .scope
 a_quit:         ; Reset the return stack (65c02 stack) pointer 
-                stx TMPX        
+                txa
                 ldx #RP0
                 txs
-                ldx TMPX
+                tax
 
                 ; Default input buffer is the Terminal Input Buffer
                 lda #<TIB       ; LSB
@@ -1106,59 +1089,35 @@ l_dump:         bra a_dump
                 .word z_dump
                 .byte "DUMP"
 .scope 
-a_dump:         ; if we were given zero bytes to display, abort the whole 
-                ; thing
-                lda 1,x
-                ora 2,x
-                beq _done 
-
-                ; start a new line
+a_dump:         ; start internal counter for 16 number per row
                 jsr l_cr 
+                ldy #$10
 
-                ; put stack parameters where we can work with them
-                lda 1,x
-                sta TMPCNT      ; this is the counter LSB 
-                lda 2,x
-                sta TMPCNT+1    ; MSB 
+_loop:          ; if there are zero bytes left to display, we're done
+                lda 1,x         ; LSB
+                ora 2,x         ; MSB
+                beq _done
 
-                lda 3,x
-                sta TMPADR      ; LSB 
-                lda 4,x
-                sta TMPADR+1    ; MSB 
-
-                ; start internal counter so we only display 16 numbers 
-                ; per row 
-                ldy #$00
-
-_loop:          ; dump the contents 
-                lda (TMPADR)
+                ; dump the contents
+                lda (3,x) 
 
                 jsr f_byte2hexasc
                 jsr l_space
 
-                iny
-                cpy #$10
-                bne _nextchar
-
-                ; start next line
-                jsr l_cr
-                ldy #$00
-
-_nextchar:      ; next char
-                inc TMPADR
+_nextchar:      ; print next character
+                inc 3,x 
                 bne _counter
-                inc TMPADR+1
+                inc 4,x
 
-_counter:       ; loop counter 
-                lda TMPCNT
-                bne + 
-                dec TMPCNT+1
-*               dec TMPCNT
+_counter:       ; loop counter
+                lda 1,x
+                bne +
+                dec 2,x
+*               dec 1,x
 
-                ; loop control
-                lda TMPCNT
-                ora TMPCNT+1
-                bne _loop 
+                dey
+                bne _loop
+                bra a_dump
 
 _done:          inx
                 inx
@@ -3490,16 +3449,15 @@ a_cmpc:         ; put xt on zero page where we can work with it better
                 
 _dojump:        ; Compile as JSR command. Add the JSR opcode ($20). We 
                 ; use Y as an index and later move the CP up
-                ldy #$00
                 lda #$20
-                sta (CP),y 
+                sta (CP)
 
-                iny             ; LSB of address
-                lda 1,x
+                ldy #$01        
+                lda 1,x         ; LSB of address
                 sta (CP),y
 
-                iny             ; MSB
-                lda 2,x 
+                iny             
+                lda 2,x         ; MSB
                 sta (CP),y
 
                 ; allot space we just used 
@@ -3627,6 +3585,7 @@ a_exe:          lda 1,x         ; LSB
 _done:          ; keep the NOP here as the landing site for the indirect 
                 ; subroutine jump (easier and quicker than adjusting the
                 ; return address on the stack)
+                ; TODO this is ugly, see if we can't do better
                 ; TODO see if z_exe should point to the NOP instead of the 
                 ; RTS 
                 nop             
@@ -7300,7 +7259,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version ALPHA 004 (21. Jan 2015)",0
+fs_version:    .byte "Version ALPHA 004 (22. Jan 2015)",0
 fs_disclaim:   .byte "Tali Forth comes with absolutely NO WARRANTY",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0
@@ -7329,9 +7288,8 @@ fse_radix:     .byte "Digit larger than base",0
 fse_defer:     .byte "DEFERed word not defined yet",0
 
 ; ----------------------------------------------------------------------------- 
-; Helper strings. These can have various formats. Leave hexstring as the last
-; one in the source code to make it easier to see where it ends in ROM
-hexstr:         .byte "0123456789ABCDEF"
+; Helper strings. Leave alphastr as the last entry in the source code to 
+; make it easier to see where it ends in ROM
 alphastr:       .byte "0123456789ABCDEFGHIJKLMNOPQRSTUVWYZ"
 ; =============================================================================
 ; END
