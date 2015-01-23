@@ -1,6 +1,6 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 21. Jan 2015
+This version: 22. Jan 2015
 
 === SHORT TERM === 
 
@@ -12,11 +12,10 @@ List of words that still need to be coded
 2R@ (R> R> 2DUP >R >R SWAP)
 LEAVE 
 MOVE 
-NEXTNAME (not ANSI, from gforth) 
 RECURSE
 WORD
 
-Completing all words on this list will trigger BETA status
+Completing all words on this list will trigger BETA status. This list is subject to change. 
 
 
 === LONGER TERM ===
