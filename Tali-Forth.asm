@@ -2,7 +2,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  23. Jan 2015 
+; This version  25. Jan 2015 
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -7112,12 +7112,84 @@ a_tor:          ; save the return address
 
 z_tor:          rts
 .scend
+; ----------------------------------------------------------------------------
+; 2>R ( x1 x2 -- ) ( R: -- x1 x2  )
+; Push two top entries to Return Stack. Is the same as SWAP >R >R
+; This instruction is used so rarely we take the speed hit and save space by
+; just using the subroutine jumps
+l_2gr:          bra a_2gr
+                .byte $03 
+                .word l_tor     ; link to TOR (">R")
+                .word z_2gr
+                .byte "2>R"
+.scope
+a_2gr:          jsr l_swap
+                jsr l_tor
+                jsr l_tor
+
+z_2gr:          rts
+.scend
+; ----------------------------------------------------------------------------
+; 2R@ ( -- x1 x2 ) (R: x1 x2 -- x1 x2 ) 
+; This is  R> R> 2DUP >R >R SWAP  but we can do this a lot faster in assembler 
+; THis routine may not be natively compiled
+l_tworfetch:    bra a_tworfetch
+                .byte $03 
+                .word l_2gr    ; link to 2>R
+                .word z_tworfetch
+                .byte "2R@"
+
+.scope
+a_tworfetch:    ; make room on the stack 
+                dex
+                dex
+                dex
+                dex
+
+                ; get four bytes off of Return Stack. This assumes that 
+                ; we took a subroutine jump here so the first two entries
+                ; are the return address
+                txa
+                tsx
+                phx             ; 65c02 has no TXY, so do it the hard way
+                ply 
+                tax
+
+                lda $0103,y     ; LSB of top entry
+                sta 1,x
+                lda $0104,y     ; MSB of top entry
+                sta 2,x
+                lda $0105,y     ; LSB of bottom entry
+                sta 3,x
+                lda $0106,y     ; MSB of top entry
+                sta 4,x
+
+z_tworfetch:    rts
+.scend
+; ----------------------------------------------------------------------------
+; 2R> ( -- x1 x2 ) (R: x1 x2 -- ) 
+; Pull two top entries from Return Stack. Is the same as >R >R SWAP
+; This instruction is used so rarely we take the speed hit and save space by
+; just using the subroutine jumps
+l_2rg:          bra a_2rg
+                .byte $03 
+                .word l_tworfetch    ; link to 2R@
+                .word z_2rg
+                .byte "2R>"
+
+.scope
+a_2rg:          jsr l_fromr
+                jsr l_fromr
+                jsr l_swap 
+
+z_2rg:          rts
+.scend
 ; -----------------------------------------------------------------------------
 ; QUESTION( c-addr -- ) ("?")
 ; Print contant of a variable 
 l_quest:        bra a_quest
                 .byte NC+$01 
-                .word l_tor     ; link to TOR (">R")
+                .word l_2rg    ; link to 2R>
                 .word z_quest
                 .byte "?"
 
