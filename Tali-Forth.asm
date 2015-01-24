@@ -4007,24 +4007,40 @@ a_align:                        ; compiles empty
 z_align:        rts             ; never reached
 ; -----------------------------------------------------------------------------
 ; MOVE  ( addr1 addr2 u -- )      
-; Copy u 16 bit words (not: bytes) from addr1 to addr2 
-; TODO code this 
+; Copy u "address units" from addr1 to addr2. Since our address units are bytes, 
+; this is just a front-end for CMOVE and CMOVE>. This is actually the only one
+; of these three words that is in the CORE set. This word must not be natively 
+; compiled
 l_move:         bra a_move
                 .byte $04 
                 .word l_align           ; link to ALIGN 
                 .word z_move
                 .byte "MOVE"
-
 .scope
 a_move:         ; abort if number of bytes to move is zero 
                 lda 1,x
                 ora 2,x
-                beq _done 
+                beq _equal
 
-                ; TODO this is just for testing 
-                rts 
+                ; compare MSB first
+                lda 4,x         ; MSB of addr2
+                cmp 6,x         ; MSB of addr1
+                beq _cmplsb     ; wasn't not helpful, move to LSB
 
-_done:          ; drop three entries from Data Stack
+                bcc _tocmoveg   ; we want CMOVE>
+                jmp cmoveint    ; CMOVE, JSR/RTS, skip check for zero
+
+_cmplsb:        ; MSB were equal, so do the whole thing over
+                lda 3,x         ; LSB of addr2
+                cmp 5,x         ; LSB of addr1
+                beq _equal      ; LSB is equal as well 
+
+                bcc _tocmoveg   ; we want CMOVE>
+                jmp cmoveint    ; CMOVE, JSR/RTS, skip check for zero
+
+_tocmoveg:      jmp cmovegint   ; JSR/RTS, skip check for zero 
+
+_equal:         ; drop three entries from Data Stack
                 txa
                 clc
                 adc #$06
@@ -4034,9 +4050,9 @@ z_move:         rts
 .scend
 ; -----------------------------------------------------------------------------
 ; CMOVE> ( addr1 addr2 u -- ) 
-; Copy u bytes from addr1 to addr2, going high to low. Based on code in 
-; Leventhal, Lance A. "6502 Assembly Language Routines", p. 201
-; This is too large to be compiled natively
+; Copy u bytes from addr1 to addr2, going high to low (addr1 is larger than
+; addr2). Based on code in Leventhal, Lance A. "6502 Assembly Language 
+; Routines", p. 201. This is too large to be compiled natively
 l_cmovegt:      bra a_cmovegt
                 .byte $06 
                 .word l_move            ; link to MOVE 
@@ -4048,7 +4064,7 @@ a_cmovegt:      ; abort if number of bytes to move is zero
                 ora 2,x
                 beq _abort 
 
-                ; move addresses to where we can work with them 
+cmovegint:      ; move addresses to where we can work with them 
                 lda 1,x
                 sta TMPCNT
                 lda 2,x
@@ -4113,9 +4129,9 @@ z_cmovegt:      rts
 .scend
 ; -----------------------------------------------------------------------------
 ; CMOVE ( addr1 addr2 u -- ) 
-; Copy u bytes from addr1 to addr2, going low to high. Based on code in
-; Leventhal, Lance A. "6502 Assembly Language Routines", p. 201
-; This is too large to be compiled natively
+; Copy u bytes from addr1 to addr2, going low to high (addr2 is larger than
+; addr1). Based on code in Leventhal, Lance A. "6502 Assembly Language 
+; Routines", p. 201. This is too large to be compiled natively
 l_cmove:        bra a_cmove
                 .byte $05 
                 .word l_cmovegt         ; link to CMOVE>
@@ -4127,7 +4143,7 @@ a_cmove:        ; abort if number of bytes to move is zero
                 ora 2,x
                 beq _abort 
 
-                ; move addresses to where we can work with them 
+cmoveint:       ; move addresses to where we can work with them 
                 lda 1,x
                 sta TMPCNT
                 lda 2,x
@@ -4314,7 +4330,9 @@ l_fill:         bra a_fill
                 .word z_fill
                 .byte "FILL"
 .scope
-a_fill:         ; save the char we're going to store
+a_fill:         ; TODO check if we have enough stuff on the stack 
+
+                ; save the char we're going to store
                 lda 1,x
                 pha 
 
@@ -7118,7 +7136,7 @@ z_tor:          rts
 ; This instruction is used so rarely we take the speed hit and save space by
 ; just using the subroutine jumps
 l_2gr:          bra a_2gr
-                .byte $03 
+                .byte CO+$03 
                 .word l_tor     ; link to TOR (">R")
                 .word z_2gr
                 .byte "2>R"
@@ -7134,7 +7152,7 @@ z_2gr:          rts
 ; This is  R> R> 2DUP >R >R SWAP  but we can do this a lot faster in assembler 
 ; THis routine may not be natively compiled
 l_tworfetch:    bra a_tworfetch
-                .byte $03 
+                .byte CO+$03 
                 .word l_2gr    ; link to 2>R
                 .word z_tworfetch
                 .byte "2R@"
@@ -7172,7 +7190,7 @@ z_tworfetch:    rts
 ; This instruction is used so rarely we take the speed hit and save space by
 ; just using the subroutine jumps
 l_2rg:          bra a_2rg
-                .byte $03 
+                .byte CO+$03 
                 .word l_tworfetch    ; link to 2R@
                 .word z_2rg
                 .byte "2R>"
