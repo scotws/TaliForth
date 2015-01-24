@@ -8,7 +8,6 @@ List of words that still need to be coded
 
 ?DO 
 LEAVE 
-MOVE 
 RECURSE
 
 Completing all words on this list will trigger BETA status. This list is subject to change. 

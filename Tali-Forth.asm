@@ -7133,17 +7133,40 @@ z_tor:          rts
 ; ----------------------------------------------------------------------------
 ; 2>R ( x1 x2 -- ) ( R: -- x1 x2  )
 ; Push two top entries to Return Stack. Is the same as SWAP >R >R
-; This instruction is used so rarely we take the speed hit and save space by
-; just using the subroutine jumps
 l_2gr:          bra a_2gr
                 .byte CO+$03 
                 .word l_tor     ; link to TOR (">R")
                 .word z_2gr
                 .byte "2>R"
 .scope
-a_2gr:          jsr l_swap
-                jsr l_tor
-                jsr l_tor
+a_2gr:          ; save the return address
+                pla             ; LSB
+                sta TMPADR
+                pla             ; MSB
+                sta TMPADR+1
+
+                ; now we can move the data 
+                lda 4,x         ; MSB
+                pha
+                lda 3,x         ; LSB
+                pha
+
+                ; now we can move the data 
+                lda 2,x         ; MSB
+                pha
+                lda 1,x         ; LSB
+                pha
+
+                ; restore return address
+                lda TMPADR+1   ; MSB
+                pha
+                lda TMPADR     ; LSB
+                pha 
+
+                inx
+                inx
+                inx
+                inx
 
 z_2gr:          rts
 .scend
@@ -7186,21 +7209,44 @@ z_tworfetch:    rts
 .scend
 ; ----------------------------------------------------------------------------
 ; 2R> ( -- x1 x2 ) (R: x1 x2 -- ) 
-; Pull two top entries from Return Stack. Is the same as >R >R SWAP
-; This instruction is used so rarely we take the speed hit and save space by
-; just using the subroutine jumps
+; Pull two top entries from Return Stack. Is the same as R> R> SWAP
 l_2rg:          bra a_2rg
                 .byte CO+$03 
                 .word l_tworfetch    ; link to 2R@
                 .word z_2rg
                 .byte "2R>"
-
 .scope
-a_2rg:          jsr l_fromr
-                jsr l_fromr
-                jsr l_swap 
+a_2rg:          ; make room on stack 
+                dex
+                dex
+                dex
+                dex
 
-z_2rg:          rts
+                ; save the return address
+                pla             ; LSB
+                sta TMPADR
+                pla             ; MSB
+                sta TMPADR+1
+
+                ; now we can access the data
+                pla             ; LSB
+                sta 1,x
+                pla             ; MSB
+                sta 2,x         
+
+                ; now we can access the data
+                pla             ; LSB
+                sta 3,x
+                pla             ; MSB
+                sta 4,x         
+ 
+                ; restore return address
+                lda TMPADR+1   ; MSB
+                pha
+                lda TMPADR     ; LSB
+                pha 
+ 
+z_2rg:          rts             ; never reached
 .scend
 ; -----------------------------------------------------------------------------
 ; QUESTION( c-addr -- ) ("?")
