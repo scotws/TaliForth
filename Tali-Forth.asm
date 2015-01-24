@@ -2,7 +2,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  22. Jan 2015 
+; This version  23. Jan 2015 
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -1341,6 +1341,83 @@ _done:          ; add a space for readability
 _finished:
 z_dots:         rts
 .scend
+; ----------------------------------------------------------------------------
+; WORD ( c "name" -- c-addr ) Parse input and return counted string. This is 
+; the archaic parsing word in Forth, since surplanted by PARSE and PARSE-NAME. 
+; It is included here against better judgement because it is used in so many
+; examples. WORD skips leading delimiters (PARSE doesn't), returns an old-style
+; counted string and has a bunch of other problems. See the discussion at
+; http://www.forth200x.org/documents/html/rationale.html#rat:core:PARSE . This 
+; word might be deleted if space pressure because too large. 
+l_word:         bra a_word
+                .byte $04 
+                .word l_dots    ; link to DOTS (".S")
+                .word z_word
+                .byte "WORD"
+
+.scope
+a_word:         ; skip over leading delimiters - this is like PARSE-NAME, 
+                ; but unlike PARSE
+                ldy INP
+
+_iloop:         cpy CIBN        ; quit if we've reached end of input 
+                beq _foundchr
+                lda (CIBA),y 
+                cmp 1,x         ; Ascii of delimiter, LSB is enough 
+                bne _foundchr
+                iny
+                bra _iloop
+
+_foundchr:      ; save index of where word starts
+                sty INP
+
+                jsr l_parse     ; returns ( addr u ) 
+
+_makecaddr:     ; Put together a c-addr out of addr u. Note it is 
+                ; currently not put in a transient area, but in 
+                ; the dictionary. Since we won't be using WORD
+                ; anyway that much, we don't care. Remember PAD is
+                ; reserved for the user
+                lda 3,x         ; move address to ZP for manipulation
+                sta TMPADR
+                lda 4,x
+                sta TMPADR+1
+
+                lda 1,x         ; save length of string in first byte
+                sta (CP)
+
+                lda CP          ; beginning of string is old HERE
+                sta 3,x
+                lda CP+1
+                sta 4,x
+
+                inc CP          ; increase CP
+                bne +
+                inc CP+1
+
+*               tay
+                phy             ; we'll need length again to update CP
+
+                dey             ; convert number of chars to offset 
+
+_loop:          lda (TMPADR),y
+                sta (CP),y
+                dey
+                bpl _loop
+
+                pla             ; update CP to after word 
+                clc
+                adc CP
+                sta CP
+                bcc _done
+                inc CP+1
+
+_done:          ; get rid of u because NOS is c-addr now 
+                inx 
+                inx
+
+z_word:         rts
+.scend
 ; -----------------------------------------------------------------------------
 ; PARSE-NAME ( "name" -- addr u ) 
 ; Parse the input buffer using a space as the delimiter, skipping leading
@@ -1351,7 +1428,7 @@ z_dots:         rts
 ; expansion to 16 bit
 l_prsnm:        bra a_prsnm
                 .byte $0A
-                .word l_dots    ; link to DOTS (".S")
+                .word l_word    ; link to WORD
                 .word z_prsnm
                 .byte "PARSE-NAME"
 .scope 
@@ -1401,7 +1478,7 @@ _done:
 z_prsnm:        rts
 .scend
 ; -----------------------------------------------------------------------------
-; PARSE ( char "name" -- addr u ) 
+; PARSE ( c "name" -- addr u ) 
 ; Parse the input buffer using char as a delimiters. Do not repeat do not 
 ; skip leading delimiters; this is an important difference to PARSE-NAME. 
 ; PARSE (and PARSE-NAME) replace WORD in modern systems, see ANS Forth 
@@ -7259,7 +7336,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version ALPHA 004 (22. Jan 2015)",0
+fs_version:    .byte "Version ALPHA 004 (25. Jan 2015)",0
 fs_disclaim:   .byte "Tali Forth comes with absolutely NO WARRANTY",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0

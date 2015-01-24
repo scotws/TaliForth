@@ -1,9 +1,10 @@
 Changelog for the Tali Forth 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-First version: 19. Jan 2014
+First version: 25. Jan 2014
 
 Add changes to top with date. Note these are only major milestones and versions.
 
+25. Jan 2015: Added WORD (against better judgement) 
 20. Jan 2015: Added ABORT", complete rewrite of S"
 19. Jan 2015: Added f_cmpljsr and friends, converted code to their use
 17. Jan 2015: Added DEFER, DEFER!, DEFER@, IS, ACTION-OF; >BODY now works
