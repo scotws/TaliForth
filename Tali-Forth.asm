@@ -93,8 +93,8 @@
 .alias TMPADR2  $AC   ; Temporary storage for even more addresses (2 bytes)
 .alias TMPCNT   $AE   ; Temporary storage for counters (2 bytes)
 .alias TMPX     $B0   ; Temporary storage for X Register (1 byte)
-.alias FLAG     $B1   ; Generic flag for use inside routines (1 byte)
-.alias FLAG2    $B2   ; Generic flag for use inside routines (1 byte)
+.alias FLAG     $B1   ; Generic flag (1 byte)
+.alias FLAG2    $B2   ; Generic flag, used by NUMBER and DO loops (1 byte)
 .alias OUTP     $B3   ; Output pointer for formated output (2 bytes)
 
 ; The zero page entries $D0 to $EF are reserved for the kernel and are 
@@ -6303,28 +6303,13 @@ a_unloop:       ; drop top two entries off the Return Stack
 z_unloop:       rts
 .scend
 ; ----------------------------------------------------------------------------
-; LEAVE ( -- )
-; TODO code me
-l_leave:        bra a_leave
-                .byte CO+$05 
-                .word l_unloop    ; link to UNLOOP
-                .word z_leave
-                .byte "LEAVE"
-
-.scope
-a_leave:        nop
-
-z_leave:        rts
-.scend
-
-; ----------------------------------------------------------------------------
 ; J ( -- n ) (R: n -- n)
 ; Copy second loop counter from Return Stack to stack. Note we use a fudge
 ; factor for loop control; see (DO) for more details. We make this native 
 ; compile for speed. 
 l_j:            bra a_j
                 .byte NC+CO+$01 
-                .word l_leave    ; link to LEAVE
+                .word l_unloop    ; link to UNLOOP
                 .word z_j
                 .byte "J"
 
@@ -6762,13 +6747,44 @@ a_pick:         lda 1,x         ; we only recognize the LSB (stack is small)
 
 z_pick:         rts
 .scend
+
+; ----------------------------------------------------------------------------
+; MROT ( m n o -- o m n )
+; Rotate the top three entries upwards
+l_mrot:         bra a_mrot
+                .byte NC+$04 
+                .word l_pick    ; link to PICK
+                .word z_mrot
+                .byte "-ROT"
+
+.scope
+a_mrot:         lda 2,x         ; MSB first
+                pha
+                lda 4,x
+                sta 2,x
+                lda 6,x
+                sta 4,x
+                pla
+                sta 6,x
+
+                lda 1,x         ; LSB second
+                pha
+                lda 3,x
+                sta 1,x
+                lda 5,x
+                sta 3,x
+                pla
+                sta 5,x
+
+z_mrot:         rts
+.scend
 ; -----------------------------------------------------------------------------
 ; ROT (m n o -- n o m )
 ; Rotate the top three entries downwards
 
 l_rot:          bra a_rot
                 .byte NC+$03 
-                .word l_pick    ; link to PICK
+                .word l_mrot    ; link to MROT
                 .word z_rot
                 .byte "ROT"
 
@@ -7413,7 +7429,7 @@ z_words:        rts
 ; get rid of all of these
 fhltbl:
         .word fh_if, fh_then, fh_else, fh_until, fh_while, fh_rpt
-        .word fh_do, fh_loop, fh_ploop, fh_is, fh_actionof 
+        .word fh_do, fh_loop, fh_ploop, fh_leave, fh_is, fh_actionof 
         .word $0000
 
 ; All high-level command strings are uppercase and start with fh_ . Note 
@@ -7449,6 +7465,8 @@ fh_loop:
 .byte 77, ": LOOP POSTPONE 1 POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
 fh_ploop:
 .byte 67, ": +LOOP POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
+fh_leave: 
+.byte 62, ": LEAVE POSTPONE BRANCH HERE SWAP 0 , ; IMMEDIATE COMPILE-ONLY"
 fh_is:
 .byte 75, ": IS STATE @ IF POSTPONE ['] POSTPONE DEFER! ELSE ' DEFER! THEN ; IMMEDIATE"
 fh_actionof: 
@@ -7472,7 +7490,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version ALPHA 004 (25. Jan 2015)",0
+fs_version:    .byte "Version ALPHA 004 (27. Jan 2015)",0
 fs_disclaim:   .byte "Tali Forth comes with absolutely NO WARRANTY",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0

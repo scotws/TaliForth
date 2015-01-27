@@ -1,6 +1,6 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 25. Jan 2015
+This version: 27. Jan 2015
 
 === SHORT TERM === 
 
@@ -20,3 +20,5 @@ Completing all words on this list will trigger BETA status. This list is subject
 - see if we can do without the various "(..)" helper functions of words
 - check code for use of BIT 
 - unroll macros for better readability of text
+- consider subroutine to compile JSR/JMP with stuff from stack
+- consider converting all LITERAL numbers directly to stack 
