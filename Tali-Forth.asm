@@ -2,7 +2,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  25. Jan 2015 
+; This version  28. Jan 2015 
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -296,7 +296,9 @@ _loop:          lda (TMPADR),y
 ;       .word <word>
 ;
 ; which simply adds the word in little-endian format. Used in various places. Note
-; this trades memory savings for a 12 clock cycle overhead because of JSR/RTS
+; this trades memory savings for a 12 clock cycle overhead because of JSR/RTS.
+; Note this uses FLAG. Note this may not be used for words that require native
+; compile
 .scope
 f_cmplword:     lda #$00        ; just compile word in little-endian
                 bra _common
@@ -3226,14 +3228,15 @@ _findit:        ; convert to upper case because string must be Forth word
                 jmp error
 .scend
 
-l_postpo_int:   ; This is the internal version of POSTPONE that lets us use
+f_postpo_int:   ; This is the internal version of POSTPONE that lets us use
                 ; the funtion in subroutine calls. It is used by adding the
                 ; xt of the word we want to postpone AFTER the call:
                 ; 
-                ;       jsr l_postpo_int
+                ;       jsr f_postpo_int
                 ;       .word <l_targetword>
                 ; 
-                ; The stack is not changed. 
+                ; The stack is not changed. Note this assumes that we know
+                ; the word is in the dictionary
 .scope 
                 ; make room on the stack for xt and flag 
                 dex
@@ -4521,7 +4524,7 @@ l_here:         bra a_here
                 .word z_here
                 .byte "HERE"
 
-a_here:         dex             ; Push the address of the user pointer 
+a_here:         dex
                 dex
                 lda CP          ; LSB
                 sta 1,x
@@ -4928,13 +4931,13 @@ z_zero:         rts
 ; -----------------------------------------------------------------------------
 ; ONE ( -- 1 ) ("1")
 ; Commonly used number, hard-coded for speed
-
 l_one:          bra a_one
                 .byte NC+$01 
                 .word l_zero    ; link to ZERO ("0")
                 .word z_one
                 .byte "1"
 
+.scope
 a_one:          dex
                 dex
                 lda #$01
@@ -4942,6 +4945,7 @@ a_one:          dex
                 stz 2,x         ; MSB
 
 z_one:          rts
+.scend
 ; -----------------------------------------------------------------------------
 ; TWO ( -- 2 ) ("2")
 ; Commonly used number, hard-coded for speed
@@ -6249,6 +6253,67 @@ _done:
 z_abs:          rts
 .scend
 ; ----------------------------------------------------------------------------
+; LEAVE ( -- ) Leave DO/LOOP construct. Note that this does not work with 
+; anything but a DO/LOOP in contrast to other versions such as discussed at
+; http://blogs.msdn.com/b/ashleyf/archive/2011/02/06/loopty-do-i-loop.aspx
+; LEAVE assumes that DO/?DO have set the FLAG2 to zero. The part without 
+; the flag is coded as 
+; ": LEAVE POSTPONE BRANCH HERE SWAP 0 , ; IMMEDIATE COMPILE-ONLY"
+; Note our LEAVE requires a IF THEN construct around it. Gforth will
+; accept DO LEAVE LOOP, we won't. 
+l_leave:        bra a_leave
+                .byte CO+IM+$05 
+                .word l_abs     ; link to ABS
+                .word z_leave
+                .byte "LEAVE"
+.scope
+a_leave:        ; compile (BRANCH) subroutine jmp. This may not be
+                ; natively compiled
+                jsr f_cmpljsr
+                .word a_pbranch
+
+                ; do HERE so we know where to replace the jump target, 
+                ; and then SWAP it with the address we have so the 
+                ; THEN, LOOP or +LOOP following has the right address
+                ; on the stack. TODO fuse and hardcode this
+
+                ; hardcoded HERE
+                dex             
+                dex
+                lda CP
+                sta 1,x
+                lda CP+1
+                sta 2,x
+
+                ; the address from LEAVE can't stay TOS, it needs to go 
+                ; below the mandatory IF and the DO addresses.
+                jsr l_mrot
+
+                ; add 0000 as placeholder behind the BRANCH 
+                ; STZ doesn't allow (CP) as an operand
+                lda #$00
+                tay
+                sta (CP)
+                iny
+                sta (CP),y
+                iny
+
+                ; adjust CP by two bytes
+                tya 
+                clc 
+                adc CP
+                sta CP
+                bcc + 
+                inc CP+1
+
+                ; set LEAVE flag (FLAG2) to signal LOOP/+LOOP that
+                ; it needs to cope with LEAVE on stack
+*               lda #$FF
+                sta FLAG2 
+
+z_leave:        rts
+.scend
+; ----------------------------------------------------------------------------
 ; PPLOOP ( n -- ) ("(+LOOP)")
 ; Runtime compile for loop control. This is used for both +LOOP and LOOP which
 ; are defined at high level. Note we use a fudge factor for loop 
@@ -6256,7 +6321,7 @@ z_abs:          rts
 ; This is Native Compile. The step value is TOS in the loop
 l_pploop:       bra a_pploop
                 .byte NC+CO+$07 
-                .word l_abs     ; link to ABS
+                .word l_leave    ; link to LEAVE
                 .word z_pploop
                 .byte "(+LOOP)"
 .scope
@@ -6276,21 +6341,97 @@ a_pploop:       clc
                 inx             ; dump step from TOS 
                 inx
 
+                ; if V flag is set, we're done looping and continue
+                ; after the +LOOP instruction
                 bvs _hack+3     ; skip over JMP instruction
 
 _hack:          ; This is why this routine must be natively compiled: We 
                 ; compile the opcode for JMP here without an address to 
-                ; go to, which is added by the next address after +LOOP
+                ; go to, which is added by the next next instruction of
+                ; LOOP/+LOOP during compile time
                 .byte $4C 
 
 z_pploop:       rts             ; never reached
+.scend
+;----------------------------------------------------------------------------
+; PLOOP ( addr -- ) ("+LOOP") 
+; Compile-time part of +LOOP, is usually realized in Forth as 
+; ": +LOOP POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
+; Note we use FLAG2 to figure out if LEAVE has been called, which puts us
+; in conflict with NUMBER. Note that LOOP jumps here 
+l_ploop:        bra a_ploop
+                .byte IM+CO+$05 
+                .word l_pploop  ; link to (+LOOP)
+                .word z_ploop
+                .byte "+LOOP"
+
+.scope
+a_ploop:        ; compile (+LOOP) -- don't call f_cmpljsr because this must 
+                ; be natively compiled
+                dex
+                dex
+                lda #<l_pploop  ; add xt of (+LOOP) to the stack
+                sta 1,x
+                lda #>l_pploop
+                sta 2,x
+                jsr l_cmpc
+
+                ; One way or the other, the correct address is now on top.
+                ; Store it so (+LOOP) jumps back up there
+                jsr l_comma
+
+                ; LEAVE trouble: If it's set, we have another 
+                ; address waiting TOS that needs to be compiled in
+                lda FLAG2
+                beq +
+
+                ; LEAVE has left us the address of its dummy value on the
+                ; stack. We can save it with HERE SWAP !  which is the 
+                ; the same code as THEN. TODO consider hardcoding this
+                ; for speed 
+                jsr l_then 
+
+                ; reset flag for next loop 
+                stz FLAG2       ; drops thru 
+                
+*               ; compile an UNLOOP for when we're all done. This is
+                ; where we end up after LEAVE, too
+                dex
+                dex
+                lda #<l_unloop  
+                sta 1,x
+                lda #>l_unloop
+                sta 2,x
+                jsr l_cmpc
+
+z_ploop:        rts
+.scend
+; ----------------------------------------------------------------------------
+; LOOP ( -- addr )  Compile-time part of LOOP. This does nothing more but push
+; 01 on the stack and then call +LOOP. In Forth, this is 
+; ": LOOP POSTPONE 1 POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
+; HIER HIER 
+l_loop:         bra a_loop
+                .byte IM+CO+$04 
+                .word l_ploop    ; link to +LOOP 
+                .word z_loop
+                .byte "LOOP"
+
+.scope
+a_loop:         ; have the finished word put "01" on the stack
+                jsr f_cmpljsr
+                .word l_one 
+
+                jmp l_ploop     ; JSR/RTS to +LOOP
+
+z_loop:         rts             ; never reached 
 .scend
 ; ----------------------------------------------------------------------------
 ; UNLOOP ( -- ; R: n1 n2 -- ) 
 ; Drop loop control stuff from Return Stack 
 l_unloop:       bra a_unloop
                 .byte NC+CO+$06 
-                .word l_pploop  ; link to PPLOOP 
+                .word l_loop    ; link to LOOP
                 .word z_unloop
                 .byte "UNLOOP"
 .scope
@@ -6427,6 +6568,72 @@ a_pdo:          ; first step: create fudge factor (FUFA) by subtracting the limi
 z_pdo:          rts
 .scend
 ; ----------------------------------------------------------------------------
+; DO ( limit start -- ) (R: -- limit start ) 
+; Compile-time part of DO. ": DO POSTPONE (DO) HERE ; IMMEDIATE COMPILE-ONLY ;"
+; Note this uses FLAG2 to allow LEAVE to work properly, so this routine 
+; currently conflicts with NUMBER. 
+l_do:           bra a_do
+                .byte IM+CO+$02 
+                .word l_pdo    ; link to PDO
+                .word z_do
+                .byte "DO"
+
+.scope
+a_do:           ; compile (DO) -- don't call f_cmpljsr because this must be
+                ; natively compiled
+                dex
+                dex
+                lda #<l_pdo     ; add xt of (DO) to the stack
+                sta 1,x
+                lda #>l_pdo
+                sta 2,x
+                jsr l_cmpc
+
+                ; HERE hardcoded for speed 
+                dex             
+                dex
+                lda CP          ; LSB
+                sta 1,x
+                lda CP+1        ; MSB
+                sta 2,x
+
+                ; set LEAVE flag to 0 (FALSE)
+                stz FLAG2
+
+z_do:           rts
+.scend
+
+; ----------------------------------------------------------------------------
+; THEN ( addr -- ) Provide target for a forward reference for IF. Note that 
+; the Forth implementation  ": THEN HERE SWAP ! ; IMMEDIATE COMPILE-ONLY"
+; is used for verious other things. Fused and natively compiled for speed
+l_then:         bra a_then
+                .byte NC+CO+IM+$04 
+                .word l_do    ; link to DO
+                .word z_then
+                .byte "THEN"
+
+.scope
+a_then:         ; Put differently, this routine has us store the CP at
+                ; the address that is provided TOS. Note that INC doesn't
+                ; allow 1,x addressing so we have to do this the hard way
+                lda 1,x
+                sta TMPADR
+                lda 2,x
+                sta TMPADR+1
+
+                lda CP
+                sta (TMPADR)
+                ldy #$01
+                lda CP+1
+                sta (TMPADR),y
+
+                inx
+                inx
+ 
+z_then:         rts
+.scend
+; ----------------------------------------------------------------------------
 ; AGAIN ( addr -- ) 
 ; This is a compile-only word, immediate. It assumes that the address we need
 ; to jump to is on the stack. Use JMP instead of BRA to make sure that we 
@@ -6434,7 +6641,7 @@ z_pdo:          rts
 ; we might want to figure out a way to combine them
 l_again:        bra a_again
                 .byte NC+IM+CO+$05 
-                .word l_pdo    ; link to PDO
+                .word l_then    ; link to THEN
                 .word z_again
                 .byte "AGAIN"
 .scope
@@ -7425,11 +7632,11 @@ z_words:        rts
 
 ; TODO see if we need all of this or just can't put these all at the end
 ; of the file and have EVALUATE run through them
-; TODO see if we can't use the internal version of POSTPONE (l_postpo_int) to 
+; TODO see if we can't use the internal version of POSTPONE (f_postpo_int) to 
 ; get rid of all of these
 fhltbl:
-        .word fh_if, fh_then, fh_else, fh_until, fh_while, fh_rpt
-        .word fh_do, fh_loop, fh_ploop, fh_leave, fh_is, fh_actionof 
+        .word fh_if, fh_else, fh_until, fh_while, fh_rpt
+        .word fh_is, fh_actionof 
         .word $0000
 
 ; All high-level command strings are uppercase and start with fh_ . Note 
@@ -7449,8 +7656,6 @@ fhltbl:
 ;          0    5   0    5    0    5    0    5    0    5    0    5    0    5    0
 fh_if:    
 .byte 55, ": IF POSTPONE 0BRANCH HERE 0 , ; IMMEDIATE COMPILE-ONLY"
-fh_then:  
-.byte 43, ": THEN HERE SWAP ! ; IMMEDIATE COMPILE-ONLY"
 fh_else:  
 .byte 67, ": ELSE POSTPONE BRANCH HERE 0 , HERE ROT ! ; IMMEDIATE COMPILE-ONLY"
 fh_until: 
@@ -7459,14 +7664,6 @@ fh_while:
 .byte 63, ": WHILE POSTPONE 0BRANCH HERE 0 , SWAP ; IMMEDIATE COMPILE-ONLY"
 fh_rpt:   
 .byte 60, ": REPEAT POSTPONE AGAIN HERE SWAP ! ; IMMEDIATE COMPILE-ONLY"
-fh_do:
-.byte 48, ": DO POSTPONE (DO) HERE ; IMMEDIATE COMPILE-ONLY"
-fh_loop:
-.byte 77, ": LOOP POSTPONE 1 POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
-fh_ploop:
-.byte 67, ": +LOOP POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
-fh_leave: 
-.byte 62, ": LEAVE POSTPONE BRANCH HERE SWAP 0 , ; IMMEDIATE COMPILE-ONLY"
 fh_is:
 .byte 75, ": IS STATE @ IF POSTPONE ['] POSTPONE DEFER! ELSE ' DEFER! THEN ; IMMEDIATE"
 fh_actionof: 
@@ -7490,7 +7687,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version ALPHA 004 (27. Jan 2015)",0
+fs_version:    .byte "Version ALPHA 004 (28. Jan 2015)",0
 fs_disclaim:   .byte "Tali Forth comes with absolutely NO WARRANTY",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0

@@ -1,9 +1,10 @@
 Changelog for the Tali Forth 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-First version: 25. Jan 2014
+First version: 28. Jan 2014
 
 Add changes to top with date. Note these are only major milestones and versions.
 
+28. Jan 2015: Added LEAVE, rewrote THEN, LOOP, +LOOP and DO
 25. Jan 2015: Added WORD (against better judgement); MOVE; 2R group of words 
 20. Jan 2015: Added ABORT", complete rewrite of S"
 19. Jan 2015: Added f_cmpljsr and friends, converted code to their use
