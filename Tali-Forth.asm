@@ -6257,38 +6257,24 @@ z_abs:          rts
 ; anything but a DO/LOOP in contrast to other versions such as discussed at
 ; http://blogs.msdn.com/b/ashleyf/archive/2011/02/06/loopty-do-i-loop.aspx
 ; ": LEAVE POSTPONE BRANCH HERE SWAP 0 , ; IMMEDIATE COMPILE-ONLY"
-; See loops.txt on details of how this works
+; See loops.txt on details of how this works. This must be native compile
+; and not IMMEDIATE
 l_leave:        bra a_leave
-                .byte CO+IM+$05 
+                .byte NC+CO+$05 
                 .word l_abs     ; link to ABS
                 .word z_leave
                 .byte "LEAVE"
 .scope
 a_leave:        ; we dump the limit/start entries off the Return Stack
                 ; (four bytes), so we need four PLAs 
-                ldy #$00
-                lda #$68        ; opcode for PLA
+                pla
+                pla
+                pla
+                pla
 
-*               sta (CP),y
-                iny 
-                cpy #$04
-                bne -
+                rts     ; keep this before z_leave so it is compiled
 
-                ; at run time, the top of the Return Stack will 
-                ; contain the address just past the loop
-                lda #$60        ; opcode for RTS
-                sta (CP),y
-                iny
-
-                ; adjust CP
-                tya
-                clc
-                adc CP
-                sta CP
-                bcc z_leave
-                inc CP+1
-
-z_leave:        rts
+z_leave:        nop     ; dummy, not reached, not compiled
 .scend
 ; ----------------------------------------------------------------------------
 ; PPLOOP ( n -- ) ("(+LOOP)")
@@ -6368,7 +6354,7 @@ a_ploop:        ; compile (+LOOP) -- don't call f_cmpljsr because this must
                 sta 2,x
                 jsr l_cmpc
 
-                ; complete compile of DO/?DO by replacing the four 
+                ; complete compile of DO/?DO by replacing the six
                 ; dummy bytes by PHA instructions. The address where 
                 ; they are located is below the RTS on the Return 
                 ; Stack. This is a lot of work for something so little
@@ -6396,7 +6382,7 @@ a_ploop:        ; compile (+LOOP) -- don't call f_cmpljsr because this must
                 lda CP+1
                 bcs +
                 dec
-*               sta TMPADR+1
+*               sta TMPADR1+1
                 
                 ; now compile this in the DO/?DO routine
                 ldy #$00
@@ -6404,7 +6390,7 @@ a_ploop:        ; compile (+LOOP) -- don't call f_cmpljsr because this must
                 lda #$A9        ; opcode for LDA immediate
                 sta (TMPADR),y
                 iny
-                lda TMPADR1     ; LSB
+                lda TMPADR1+1   ; MSB
                 sta (TMPADR),y
                 iny
                 lda #$48        ; Opcode for PHA
@@ -6414,7 +6400,7 @@ a_ploop:        ; compile (+LOOP) -- don't call f_cmpljsr because this must
                 lda #$A9        ; opcode for LDA immediate
                 sta (TMPADR),y
                 iny
-                lda TMPADR1+1        ; MSB
+                lda TMPADR1     ; LSB
                 sta (TMPADR),y
                 iny
                 lda #$48        ; Opcode for PHA
@@ -6542,6 +6528,44 @@ a_i:            dex
 z_i:            rts             ; should be never reached, because NC 
 .scend
 ; ----------------------------------------------------------------------------
+; PQDO ( -- ) ("(?DO)")
+; Runtime routine for ?DO -- note this just contains the parts required
+; for the question mark, the rest of DO is handled by (DO) (see PDO) 
+; This must be native compile
+l_pqdo:         bra a_pqdo
+                .byte CO+NC+$05 
+                .word l_i    ; link to I
+                .word z_pqdo
+                .byte "(?DO)"
+
+.scope
+a_pqdo:         ; see if TOS and NOS are equal
+                jsr l_2dup      
+                jsr l_equal     ; gives us ( n1 n2 f ) 
+
+                lda 1,x         ; just need one byte of flag
+                beq _do_do      ; if not equal, just continue with (DO)
+
+                ; we're equal, so dump everything and jump beyond the loop
+                ; first, dump six entries off of the Data Stack
+                txa
+                clc
+                adc #$06        
+                tax
+
+                ; second, abort the whole loop. We don't have the 
+                ; limit/start parameters on the Return Stack yet, just the 
+                ; address that points to the end of the loop. Dump the 
+                ; RTS of ?DO and then just RTS ourselves
+                pla
+                pla
+                rts
+
+_do_do:         inx             ; clear flag from EQUAL off stack
+                inx             ; this merges into (DO) 
+z_pqdo:         nop             ; dummy: never reached, not compiled
+.scend
+; ----------------------------------------------------------------------------
 ; PDO ( limit start -- ; R: -- limit start ) ("(DO)") 
 ; Runtime routine for DO loop. Note that ANSI loops quit when the boundry of
 ; limit-1 and limit is reached, a different mechanism than the FIG Forth loop 
@@ -6554,7 +6578,7 @@ z_i:            rts             ; should be never reached, because NC
 ; This routine must be native compile (and should be anyway for speed). 
 l_pdo:          bra a_pdo
                 .byte CO+NC+$04 
-                .word l_i    ; link to I
+                .word l_pqdo    ; link to (?DO)
                 .word z_pdo
                 .byte "(DO)"
 .scope
@@ -6583,8 +6607,7 @@ a_pdo:          ; first step: create fudge factor (FUFA) by subtracting the limi
                 pha
 
                 ; we've saved the FUFA on the NOS of the R stack, so we can
-                ; use it later
-
+                ; use it later. Clean the Data Stack
                 inx
                 inx
                 inx
@@ -6593,19 +6616,41 @@ a_pdo:          ; first step: create fudge factor (FUFA) by subtracting the limi
 z_pdo:          rts
 .scend
 ; ----------------------------------------------------------------------------
+; ?DO ( limit start -- ) (R: -- limit start ) 
+; Compile-time part of ?DO. This may not be native compiled.
+l_qdo:          bra a_qdo
+                .byte IM+CO+$03 
+                .word l_pdo    ; link to PDO
+                .word z_qdo
+                .byte "?DO"
+
+.scope
+a_qdo:          ; ?DO shares most of its code with DO. Use a flag to decide
+                ; which is which
+                lda #$FF
+                sta FLAG2 
+                bra do_common   ; keep this routine close to DO
+
+z_qdo:          rts             ; never reached
+.scend
+; ----------------------------------------------------------------------------
 ; DO ( limit start -- ) (R: -- limit start ) 
 ; Compile-time part of DO. ": DO POSTPONE (DO) HERE ; IMMEDIATE COMPILE-ONLY ;"
 ; To work with LEAVE, we compile a routine that pushes the end address to 
 ; the Return Stack at run time. This is based on a suggestion by Garth Wilson,
-; see loops.txt for details. 
+; see loops.txt for details. This may not be native compile.
 l_do:           bra a_do
                 .byte IM+CO+$02 
-                .word l_pdo    ; link to PDO
+                .word l_qdo    ; link to ?DO
                 .word z_do
                 .byte "DO"
 
 .scope
-a_do:           ; we push HERE to the 65c02's stack so LOOP/+LOOP
+a_do:           ; DO and ?DO share most of their code, use the FLAG2 to 
+                ; determine which is which.
+                stz FLAG2       ; this is the original
+
+do_common:      ; we push HERE to the 65c02's stack so LOOP/+LOOP
                 ; knows where to compile the PHA instructions. We put this
                 ; on the Return Stack so we avoid getting mixed up in 
                 ; IF/THEN and other stuff that uses the Data Stack
@@ -6644,9 +6689,22 @@ a_do:           ; we push HERE to the 65c02's stack so LOOP/+LOOP
                 bcc +
                 inc CP+1
 
+                ; compile the (?DO) portion of ?DO if appropriate
+*               lda FLAG2
+                beq _do_cmpl
+
+                ; we came from ?DO, so compile (?DO) first
+                dex
+                dex
+                lda #<l_pqdo    ; add xt of (?DO) to the stack
+                sta 1,x
+                lda #>l_pqdo
+                sta 2,x
+                jsr l_cmpc      ; drops through to _do_cmpl
+
                 ; compile (DO) -- don't call f_cmpljsr because this must be
                 ; natively compiled
-*               dex
+_do_cmpl:       dex
                 dex
                 lda #<l_pdo     ; add xt of (DO) to the stack
                 sta 1,x
