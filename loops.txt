@@ -1,0 +1,9 @@
+How Tali Forth handles LOOPs
+Scot W. Stevenson <scot.stevenson@gmail.com>
+First version: 30. Jan 2017
+This version: 30. Jan 2017
+
+http://forum.6502.org/viewtopic.php?f=9&t=3176
+
+
+(How LEAVE works, how J must be changed)

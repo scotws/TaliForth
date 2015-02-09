@@ -2,7 +2,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  28. Jan 2015 
+; This version  09. Feb 2015
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -94,7 +94,7 @@
 .alias TMPCNT   $AE   ; Temporary storage for counters (2 bytes)
 .alias TMPX     $B0   ; Temporary storage for X Register (1 byte)
 .alias FLAG     $B1   ; Generic flag (1 byte)
-.alias FLAG2    $B2   ; Generic flag, used by NUMBER and DO loops (1 byte)
+.alias FLAG2    $B2   ; Generic flag (1 byte)
 .alias OUTP     $B3   ; Output pointer for formated output (2 bytes)
 
 ; The zero page entries $D0 to $EF are reserved for the kernel and are 
@@ -6256,60 +6256,37 @@ z_abs:          rts
 ; LEAVE ( -- ) Leave DO/LOOP construct. Note that this does not work with 
 ; anything but a DO/LOOP in contrast to other versions such as discussed at
 ; http://blogs.msdn.com/b/ashleyf/archive/2011/02/06/loopty-do-i-loop.aspx
-; LEAVE assumes that DO/?DO have set the FLAG2 to zero. The part without 
-; the flag is coded as 
 ; ": LEAVE POSTPONE BRANCH HERE SWAP 0 , ; IMMEDIATE COMPILE-ONLY"
-; Note our LEAVE requires a IF THEN construct around it. Gforth will
-; accept DO LEAVE LOOP, we won't. 
+; See loops.txt on details of how this works
 l_leave:        bra a_leave
                 .byte CO+IM+$05 
                 .word l_abs     ; link to ABS
                 .word z_leave
                 .byte "LEAVE"
 .scope
-a_leave:        ; compile (BRANCH) subroutine jmp. This may not be
-                ; natively compiled
-                jsr f_cmpljsr
-                .word a_pbranch
+a_leave:        ; we dump the limit/start entries off the Return Stack
+                ; (four bytes), so we need four PLAs 
+                ldy #$00
+                lda #$68        ; opcode for PLA
 
-                ; do HERE so we know where to replace the jump target, 
-                ; and then SWAP it with the address we have so the 
-                ; THEN, LOOP or +LOOP following has the right address
-                ; on the stack. TODO fuse and hardcode this
+*               sta (CP),y
+                iny 
+                cpy #$04
+                bne -
 
-                ; hardcoded HERE
-                dex             
-                dex
-                lda CP
-                sta 1,x
-                lda CP+1
-                sta 2,x
-
-                ; the address from LEAVE can't stay TOS, it needs to go 
-                ; below the mandatory IF and the DO addresses.
-                jsr l_mrot
-
-                ; add 0000 as placeholder behind the BRANCH 
-                ; STZ doesn't allow (CP) as an operand
-                lda #$00
-                tay
-                sta (CP)
-                iny
+                ; at run time, the top of the Return Stack will 
+                ; contain the address just past the loop
+                lda #$60        ; opcode for RTS
                 sta (CP),y
                 iny
 
-                ; adjust CP by two bytes
-                tya 
-                clc 
+                ; adjust CP
+                tya
+                clc
                 adc CP
                 sta CP
-                bcc + 
+                bcc z_leave
                 inc CP+1
-
-                ; set LEAVE flag (FLAG2) to signal LOOP/+LOOP that
-                ; it needs to cope with LEAVE on stack
-*               lda #$FF
-                sta FLAG2 
 
 z_leave:        rts
 .scend
@@ -6357,8 +6334,10 @@ z_pploop:       rts             ; never reached
 ; PLOOP ( addr -- ) ("+LOOP") 
 ; Compile-time part of +LOOP, is usually realized in Forth as 
 ; ": +LOOP POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
-; Note we use FLAG2 to figure out if LEAVE has been called, which puts us
-; in conflict with NUMBER. Note that LOOP jumps here 
+; Note that LOOP uses this routine as well. We jump here with the address
+; for looping as TOS, and the address for aborting the loop (LEAVE) as the
+; second double-byte entry on the Return Stack (see DO and loops.txt for
+; details).
 l_ploop:        bra a_ploop
                 .byte IM+CO+$05 
                 .word l_pploop  ; link to (+LOOP)
@@ -6376,26 +6355,11 @@ a_ploop:        ; compile (+LOOP) -- don't call f_cmpljsr because this must
                 sta 2,x
                 jsr l_cmpc
 
-                ; One way or the other, the correct address is now on top.
+                ; The address we need to loop back to is TOS
                 ; Store it so (+LOOP) jumps back up there
                 jsr l_comma
 
-                ; LEAVE trouble: If it's set, we have another 
-                ; address waiting TOS that needs to be compiled in
-                lda FLAG2
-                beq +
-
-                ; LEAVE has left us the address of its dummy value on the
-                ; stack. We can save it with HERE SWAP !  which is the 
-                ; the same code as THEN. TODO consider hardcoding this
-                ; for speed 
-                jsr l_then 
-
-                ; reset flag for next loop 
-                stz FLAG2       ; drops thru 
-                
-*               ; compile an UNLOOP for when we're all done. This is
-                ; where we end up after LEAVE, too
+                ; compile an UNLOOP for when we're all done
                 dex
                 dex
                 lda #<l_unloop  
@@ -6404,13 +6368,64 @@ a_ploop:        ; compile (+LOOP) -- don't call f_cmpljsr because this must
                 sta 2,x
                 jsr l_cmpc
 
+                ; complete compile of DO/?DO by replacing the four 
+                ; dummy bytes by PHA instructions. The address where 
+                ; they are located is below the RTS on the Return 
+                ; Stack. This is a lot of work for something so little
+                ; and can probably be improved
+                ply             ; LSB
+                sty TMPCNT      ; not used as counter 
+                ply             ; MSB
+
+                pla             ; LSB of target address
+                sta TMPADR
+                pla             ; MSB
+                sta TMPADR+1
+
+                ; replace RTS address before something bad happens
+                phy             ; MSB
+                ldy TMPCNT
+                phy             ; LSB
+
+                ; because of the way that RTS works we don't need to 
+                ; save CP, but CP-1
+                sec
+                lda CP
+                sbc #$01        ; DEC doesn't affect C-flag
+                sta TMPADR1
+                lda CP+1
+                bcs +
+                dec
+*               sta TMPADR+1
+                
+                ; now compile this in the DO/?DO routine
+                ldy #$00
+
+                lda #$A9        ; opcode for LDA immediate
+                sta (TMPADR),y
+                iny
+                lda TMPADR1     ; LSB
+                sta (TMPADR),y
+                iny
+                lda #$48        ; Opcode for PHA
+                sta (TMPADR),y
+                iny
+
+                lda #$A9        ; opcode for LDA immediate
+                sta (TMPADR),y
+                iny
+                lda TMPADR1+1        ; MSB
+                sta (TMPADR),y
+                iny
+                lda #$48        ; Opcode for PHA
+                sta (TMPADR),y
+
 z_ploop:        rts
 .scend
 ; ----------------------------------------------------------------------------
 ; LOOP ( -- addr )  Compile-time part of LOOP. This does nothing more but push
 ; 01 on the stack and then call +LOOP. In Forth, this is 
 ; ": LOOP POSTPONE 1 POSTPONE (+LOOP) , POSTPONE UNLOOP ; IMMEDIATE COMPILE-ONLY"
-; HIER HIER 
 l_loop:         bra a_loop
                 .byte IM+CO+$04 
                 .word l_ploop    ; link to +LOOP 
@@ -6427,17 +6442,24 @@ a_loop:         ; have the finished word put "01" on the stack
 z_loop:         rts             ; never reached 
 .scend
 ; ----------------------------------------------------------------------------
-; UNLOOP ( -- ; R: n1 n2 -- ) 
-; Drop loop control stuff from Return Stack 
+; UNLOOP ( -- ; R: n1 n2 n3 -- ) 
+; Drop loop control stuff from Return Stack. Note that 6 * PLA uses just
+; as many bytes as a loop would
 l_unloop:       bra a_unloop
                 .byte NC+CO+$06 
                 .word l_loop    ; link to LOOP
                 .word z_unloop
                 .byte "UNLOOP"
 .scope
-a_unloop:       ; drop top two entries off the Return Stack 
+a_unloop:       ; drop fudge number (limit/start) from DO/?DO off the 
+                ; Return Stack 
                 pla
                 pla
+                pla
+                pla
+
+                ; now drop the LEAVE address that was below them off the
+                ; Return Stack as well
                 pla
                 pla
 
@@ -6446,8 +6468,11 @@ z_unloop:       rts
 ; ----------------------------------------------------------------------------
 ; J ( -- n ) (R: n -- n)
 ; Copy second loop counter from Return Stack to stack. Note we use a fudge
-; factor for loop control; see (DO) for more details. We make this native 
-; compile for speed. 
+; factor for loop control; see (DO) for more details. At this point, we
+; have the "I" counter/limit and the LEAVE address on the stack above this
+; (three entries), whereas the ideal Forth implementation would just have
+; two. See loops.txt for details. Make this native compiled for speed
+; TODO test this 
 l_j:            bra a_j
                 .byte NC+CO+$01 
                 .word l_unloop    ; link to UNLOOP
@@ -6465,12 +6490,12 @@ a_j:            dex
                 tsx
 
                 sec
-                lda $0105,x     ; LSB
-                sbc $0107,x
+                lda $0107,x     ; LSB
+                sbc $0109,x
                 sta TMPCNT
 
-                lda $0106,x     ; MSB
-                sbc $0108,x
+                lda $0108,x     ; MSB
+                sbc $010A,x
 
                 ldx TMPX
 
@@ -6526,7 +6551,7 @@ z_i:            rts             ; should be never reached, because NC
 ; Flag trip when it is reached; see http://forum.6502.org/viewtopic.php?f=9&t=2026 
 ; for further discussion of this. The source given there for this idea is 
 ; Laxen & Perry F83. 
-; This routine must be native compile. 
+; This routine must be native compile (and should be anyway for speed). 
 l_pdo:          bra a_pdo
                 .byte CO+NC+$04 
                 .word l_i    ; link to I
@@ -6570,8 +6595,9 @@ z_pdo:          rts
 ; ----------------------------------------------------------------------------
 ; DO ( limit start -- ) (R: -- limit start ) 
 ; Compile-time part of DO. ": DO POSTPONE (DO) HERE ; IMMEDIATE COMPILE-ONLY ;"
-; Note this uses FLAG2 to allow LEAVE to work properly, so this routine 
-; currently conflicts with NUMBER. 
+; To work with LEAVE, we compile a routine that pushes the end address to 
+; the Return Stack at run time. This is based on a suggestion by Garth Wilson,
+; see loops.txt for details. 
 l_do:           bra a_do
                 .byte IM+CO+$02 
                 .word l_pdo    ; link to PDO
@@ -6579,9 +6605,48 @@ l_do:           bra a_do
                 .byte "DO"
 
 .scope
-a_do:           ; compile (DO) -- don't call f_cmpljsr because this must be
+a_do:           ; we push HERE to the 65c02's stack so LOOP/+LOOP
+                ; knows where to compile the PHA instructions. We put this
+                ; on the Return Stack so we avoid getting mixed up in 
+                ; IF/THEN and other stuff that uses the Data Stack
+
+                ; but first we need to move the actual return address
+                ; for this routine out of the way
+                ply             ; LSB
+                sty TMPADR
+                ply             ; MSB
+
+                ; now we can save HERE 
+                lda CP+1        ; MSB first
+                pha
+                lda CP
+                pha             ; then LSB
+
+                ; put RTS address back before something bad happens
+                phy             ; MSB
+                ldy TMPADR
+                phy             ; LSB
+
+                ; now we compile six dummy bytes that LOOP/+LOOP will
+                ; replace by the actual LDA/PHA instructions
+                lda #$05        ; we don't really care about value 
+                tay
+*                       
+                sta (CP),y
+                dey
+                bpl -
+
+                ; update CP
+                inc             ; we used 5 as a dummy value, this is why 
+                clc
+                adc CP
+                sta CP
+                bcc +
+                inc CP+1
+
+                ; compile (DO) -- don't call f_cmpljsr because this must be
                 ; natively compiled
-                dex
+*               dex
                 dex
                 lda #<l_pdo     ; add xt of (DO) to the stack
                 sta 1,x
@@ -6589,7 +6654,9 @@ a_do:           ; compile (DO) -- don't call f_cmpljsr because this must be
                 sta 2,x
                 jsr l_cmpc
 
-                ; HERE hardcoded for speed 
+                ; HERE, hardcoded for speed. We put it on the Data Stack
+                ; where LOOP/+LOOP takes it from. Note this has nothing to
+                ; do with the HERE we're saving for LEAVE
                 dex             
                 dex
                 lda CP          ; LSB
@@ -6597,12 +6664,8 @@ a_do:           ; compile (DO) -- don't call f_cmpljsr because this must be
                 lda CP+1        ; MSB
                 sta 2,x
 
-                ; set LEAVE flag to 0 (FALSE)
-                stz FLAG2
-
 z_do:           rts
 .scend
-
 ; ----------------------------------------------------------------------------
 ; THEN ( addr -- ) Provide target for a forward reference for IF. Note that 
 ; the Forth implementation  ": THEN HERE SWAP ! ; IMMEDIATE COMPILE-ONLY"
@@ -7632,8 +7695,8 @@ z_words:        rts
 
 ; TODO see if we need all of this or just can't put these all at the end
 ; of the file and have EVALUATE run through them
-; TODO see if we can't use the internal version of POSTPONE (f_postpo_int) to 
-; get rid of all of these
+; TODO see if there isn't a way to get rid of these by making real 
+; routines out of them
 fhltbl:
         .word fh_if, fh_else, fh_until, fh_while, fh_rpt
         .word fh_is, fh_actionof 
@@ -7687,7 +7750,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version ALPHA 004 (28. Jan 2015)",0
+fs_version:    .byte "Version ALPHA (09. Feb 2015)",0
 fs_disclaim:   .byte "Tali Forth comes with absolutely NO WARRANTY",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0
