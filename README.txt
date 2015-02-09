@@ -1,7 +1,7 @@
 README for Tali Forth for the 65c02 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 19. Jan 2014
-This version:  28. Jan 2015
+This version:  09. Feb 2015
 
 
 This is the README.txt version released with Tali Forth ALPHA 004. Note that this is an ALPHA release of an incomplete program. See the .ods spreadsheet for a list of supported instructions, or type WORDS once Tali Forth is running. Tali Forth is hosted at GitHub, you can find the most current version at 
@@ -45,7 +45,7 @@ As a very simple implementation, Tali Forth does not support multitasking and is
 
 The "functional" reference is gforth (http://www.gnu.org/software/gforth/). Code that works on Tali Forth should produce the same result in gForth or have a good reason why it is different. 
 
-LEAVE does not work with BEGIN and REPEAT as demonstrated with http://blogs.msdn.com/b/ashleyf/archive/2011/02/06/loopty-do-i-loop.aspx -- we follow Gforth and the ANS Forth standard here. Also, LEAVE does not work inside a plain DO/LOOP construct as in Gforth but requires a IF/THEN test (so no DO LEAVE LOOP with Tali).
+LEAVE does not work with BEGIN and REPEAT as demonstrated with http://blogs.msdn.com/b/ashleyf/archive/2011/02/06/loopty-do-i-loop.aspx -- we follow Gforth and the ANS Forth standard here. 
 
 
 

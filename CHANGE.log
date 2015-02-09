@@ -4,6 +4,7 @@ First version: 28. Jan 2014
 
 Add changes to top with date. Note these are only major milestones and versions.
 
+09. Feb 2015: Added new and working versions of DO/?DO/LEAVE/LOOP/+LOOP
 28. Jan 2015: Added LEAVE, rewrote THEN, LOOP, +LOOP and DO
 25. Jan 2015: Added WORD (against better judgement); MOVE; 2R group of words 
 20. Jan 2015: Added ABORT", complete rewrite of S"

@@ -1,12 +1,11 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 28. Jan 2015
+This version: 09. Feb 2015
 
 === SHORT TERM === 
 
 List of words that still need to be coded
 
-?DO 
 RECURSE
 
 Completing all words on this list will trigger BETA status. This list is subject to change. 
@@ -20,4 +19,8 @@ Completing all words on this list will trigger BETA status. This list is subject
 - check code for use of BIT 
 - unroll macros for better readability of text
 - consider subroutine to compile JSR/JMP with stuff from stack
+
+
+=== SUGGESTIONS === 
+
 - warn when we redefine a word already in the dictionary
