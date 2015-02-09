@@ -1,9 +1,23 @@
-How Tali Forth handles LOOPs
+How Tali Forth handles loops and branches
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 30. Jan 2017
-This version: 30. Jan 2017
-
-http://forum.6502.org/viewtopic.php?f=9&t=3176
+This version: 09. Feb 2015
 
 
-(How LEAVE works, how J must be changed)
+This document gives the background on how Tali Forth as a STC Forth variant
+handles loops (DO/?DO/LEAVE/LOOP/+LOOP) and branches (IF/ELSE/THEN). It is based
+on a discussion at http://forum.6502.org/viewtopic.php?f=9&t=3176 , see there
+for more details. 
+
+
+BRANCHES
+
+Branches are easier to understand at first, so we start with them. 
+
+
+
+LOOPS 
+
+
+
+

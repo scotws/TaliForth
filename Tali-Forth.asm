@@ -3359,7 +3359,7 @@ l_semic:        bra a_semic
                 .byte ";"
 .scope
 a_semic:        ; The current CP will be the byte our Code End link points
-                ; to. 
+                ; to in the header (z_xxxx).
                 ldy #$05
                 lda CP
                 sta (WRKWRD),y
@@ -3420,7 +3420,7 @@ a_colon:        ; if we're already compiling, complain and return
                 ; we save the link (xt) of the new word to make life easier
                 ; when it is time to add it to the dictionary. COLON and 
                 ; SEMICOLON are the only routines allowed to access this 
-                ; variable
+                ; variable; it is read by RECURSE
 *               lda DP          ; LSB 
                 sta WRKWRD
                 lda DP+1        ; MSB 
@@ -6674,10 +6674,10 @@ do_common:      ; we push HERE to the 65c02's stack so LOOP/+LOOP
 
                 ; now we compile six dummy bytes that LOOP/+LOOP will
                 ; replace by the actual LDA/PHA instructions
-                lda #$05        ; we don't really care about value 
+                lda #$05        ; we don't really care about the value 
                 tay
-*                       
-                sta (CP),y
+                        
+*               sta (CP),y
                 dey
                 bpl -
 
