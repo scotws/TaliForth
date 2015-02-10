@@ -1,26 +1,21 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 09. Feb 2015
+This version: 10. Feb 2015
 
-=== SHORT TERM === 
+As of Feb 10, 2015 Tali Forth is in BETA status. This means the code has entered a "feature freeze" (ie no new words) with the aim of finding bugs and opitimizing the code. Optimization areas include: 
 
-List of words that still need to be coded
-
-RECURSE
-
-Completing all words on this list will trigger BETA status. This list is subject to change. 
-
-
-=== LONGER TERM ===
-
-- use internal version of POSTPONE (l_postpo_int) to clean up code
 - simplify high-level word definitions
 - see if we can do without the various "(..)" helper functions of words
 - check code for use of BIT 
 - unroll macros for better readability of text
 - consider subroutine to compile JSR/JMP with stuff from stack
 
+Apart from that, we should look into a formal testing suit for Forth.
 
-=== SUGGESTIONS === 
 
+=== SUGGESTIONS FOR ADDITIONAL FEATURES === 
+
+These will be considered once Tali Forth has reached its first full release, not before
+
+- add CASE, TIME&DATE, THROW/CATCH
 - warn when we redefine a word already in the dictionary

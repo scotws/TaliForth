@@ -2,7 +2,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  09. Feb 2015
+; This version  10. Feb 2015 (first BETA)
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -77,7 +77,7 @@
 
 .alias DP       $90   ; Dictionary Pointer (last entry; 2 bytes)
 .alias CP       $92   ; Compiler Pointer (next free RAM byte; 2 bytes)
-;               $94   ; UNUSED
+;               $94   ; UNUSED TODO close this gap
 .alias STATE    $95   ; Compile state flag, TRUE is compile (2 bytes)
 .alias BASE     $97   ; Number base, default decimal ($0A) (1 byte) 
 .alias CIBA     $98   ; Address of the Current Input Buffer (CIB) (2 bytes)
@@ -1046,7 +1046,7 @@ a_abortq:       ; parse message and save the address and length
                 ; when run (S") 
                 jsr l_squote 
 
-                ; compile runtime component
+                ; compile runtime component (ABORT)
                 jsr f_cmpljsr
                 .word l_pabortq
 
@@ -1057,7 +1057,7 @@ z_abortq:       rts
 ; Runtime component of ABORT". If flag on Data Stack is true, print message and
 ; abort
 l_pabortq:      bra a_pabortq
-                .byte $08 
+                .byte CO+$08 
                 .word l_abortq    ; link to ABORTQ
                 .word z_pabortq
                 .byte "(ABORT", $22, ")"
@@ -4567,39 +4567,13 @@ a_key:          jsr f_getchr    ; returns key found in A
                 stz 2,x         ; MSB, always zero 
 
 z_key:          rts
-; -----------------------------------------------------------------------------
-; OUT-PORT (  -- ) 
-; System Variable: Channel for output
-; TODO code me 
-; TODO test me
-l_outchan:      bra a_outchan
-                .byte $08 
-                .word l_key     ; link to KEY
-                .word z_outchan
-                .byte "OUT-PORT"
-
-a_outchan:      nop
-z_outchan:      rts
-; -----------------------------------------------------------------------------
-; IN-PORT ( -- ) 
-; SYSTEM Variable: Channel for input
-; TODO code me 
-; TODO test me
-l_inchan:       bra a_inchan
-                .byte $07 
-                .word l_outchan ; link to OUT-PORT
-                .word z_inchan
-                .byte "IN-PORT"
-
-a_inchan:       nop
-z_inchan:       rts
 ; ----------------------------------------------------------------------------
 ; TOUPPER  ( char -- char ) 
 ; If char is lower case letter, convert to uppercase, else leave unchanged
 ; This is basically just a wrapper for l_toupper 
 l_2upper:       bra a_2upper
                 .byte NC+$07 
-                .word l_inchan   ; link to IN-PORT
+                .word l_key     ; link to KEY
                 .word z_2upper
                 .byte "TOUPPER"
 .scope
@@ -5425,7 +5399,7 @@ z_stod:         rts
 ; Shift cell u bits to the right. We mask the anything except the lower
 ; 4 bit of u so we can maximally move 16 bit 
 l_rshift:       bra a_rshift
-                .byte $06 
+                .byte NC+$06 
                 .word l_stod    ; link to STOD ("S>D")
                 .word z_rshift
                 .byte "RSHIFT"
@@ -6253,6 +6227,46 @@ _done:
 z_abs:          rts
 .scend
 ; ----------------------------------------------------------------------------
+; RECURSE ( -- ) Copy recursive call to word currently being defined
+; This may not be native compile. Test with 
+; " : GCD ( a b -- gcd) ?DUP IF TUCK MOD RECURSE THEN ;" for instance with
+; "784 48 GCD ." --> 16 ; example from
+; http://galileo.phys.virginia.edu/classes/551.jvn.fall01/primer.htm
+l_recurse:      bra a_recurse
+                .byte IM+CO+$07 
+                .word l_abs     ; link to ABS
+                .word z_recurse
+                .byte "RECURSE"
+.scope
+a_recurse:      ; the whole routine amounts to compiling a reference to 
+                ; the word that is being compiled. First, we save the JSR
+                ; instruction
+                ldy #$00
+
+                lda #$20        ; opcode for JSR
+                sta (CP),y
+                iny 
+
+                ; next, we save the LSB and MSB of the xt of the word 
+                ; we are currently working on, which is saved in WRKWRD
+                lda WRKWRD      ; LSB
+                sta (CP),y
+                iny
+                lda WRKWRD+1    ; MSB
+                sta (CP),y
+                iny
+
+                ; update CP
+                tya
+                clc
+                adc CP
+                sta CP
+                bcc z_recurse
+                inc CP+1
+
+z_recurse:      rts
+.scend
+; ----------------------------------------------------------------------------
 ; LEAVE ( -- ) Leave DO/LOOP construct. Note that this does not work with 
 ; anything but a DO/LOOP in contrast to other versions such as discussed at
 ; http://blogs.msdn.com/b/ashleyf/archive/2011/02/06/loopty-do-i-loop.aspx
@@ -6261,7 +6275,7 @@ z_abs:          rts
 ; and not IMMEDIATE
 l_leave:        bra a_leave
                 .byte NC+CO+$05 
-                .word l_abs     ; link to ABS
+                .word l_recurse    ; link to RECURSE
                 .word z_leave
                 .byte "LEAVE"
 .scope
@@ -7808,7 +7822,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version ALPHA (09. Feb 2015)",0
+fs_version:    .byte "Version BETA (10. Feb 2015)",0
 fs_disclaim:   .byte "Tali Forth comes with absolutely NO WARRANTY",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0

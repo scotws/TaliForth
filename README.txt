@@ -1,10 +1,10 @@
 README for Tali Forth for the 65c02 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 19. Jan 2014
-This version:  09. Feb 2015
+This version:  10. Feb 2015
 
 
-This is the README.txt version released with Tali Forth ALPHA 004. Note that this is an ALPHA release of an incomplete program. See the .ods spreadsheet for a list of supported instructions, or type WORDS once Tali Forth is running. Tali Forth is hosted at GitHub, you can find the most current version at 
+This is the README.txt version released with Tali Forth BETA 001. Note that this is a BETA release of an incomplete program. See the .ods spreadsheet for a list of supported instructions, or type WORDS once Tali Forth is running. Tali Forth is hosted at GitHub, you can find the most current version at 
 
         https://github.com/scotws/TaliForth
 
@@ -35,18 +35,15 @@ Tali Forth aims to be, in rough order of priority:
 
 
 
-IMPLEMENTATION NOTES (ALPHA 004) 
+IMPLEMENTATION NOTES (BETA 001)
 
-Important core words are still missing. Other parts have barely been tested. 
+A lot of words have barely been tested. Most are unoptimized.
 
 Tali Forth uses subroutine threading for longer words but automatically compiles shorter routines in native 65c02 code. In the current version, the decision which words are compiled how is on an ad-hoc basis; in future, this will follow a rule based on speed and size of the routine. 
 
 As a very simple implementation, Tali Forth does not support multitasking and is not thread safe in any sense of the word. There are no individual USER variables. Interrupts are currently not implemented in the kernel or Forth code. 
 
 The "functional" reference is gforth (http://www.gnu.org/software/gforth/). Code that works on Tali Forth should produce the same result in gForth or have a good reason why it is different. 
-
-LEAVE does not work with BEGIN and REPEAT as demonstrated with http://blogs.msdn.com/b/ashleyf/archive/2011/02/06/loopty-do-i-loop.aspx -- we follow Gforth and the ANS Forth standard here. 
-
 
 
 ASSEMBLY AND TESTING

@@ -10,6 +10,3 @@ USE THESE FOR PRIMITIVE REGRESSION TESTING
 
 char & parse jack& type                 \ should print "jack"    
 
-
-
-

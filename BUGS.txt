@@ -1,18 +1,10 @@
 KNOWN ISSUES for Tali Forth for the 65c02 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 02. Nov 2014
-This version:  09. Feb 2015
+This version:  10. Feb 2015
 
-This is the list of known issues with Tali Forth ALPHA 004. Note that this is an ALPHA release of an incomplete program, so there are probably going to be more bugs than working routines. See the .ods spreadsheet for a list of supported instructions, or type WORDS once Tali Forth is running. 
+This is the list of known issues with Tali Forth BETA. 
 
-
-MAJOR KNOWN PROBLEMS
-
-- not all ANSI core instructions coded yet (see TODO.txt)
-
-
-MINOR KNOW PROBLEMS
-
-Currenty too many to count. Seriously, this is an ALPHA release.
+-- CURRENTLY EMPTY -- (but don't let that fool you)
 
 (END)
