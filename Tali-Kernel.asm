@@ -4,7 +4,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  02. Nov 2014
+; This version  11. Feb 2015
 ; -----------------------------------------------------------------------------
 ; Very basic and thin software layer to provide a basis for the Forth system 
 ; to run on. 
@@ -330,9 +330,9 @@ k_wrtchrVIAb:
 ; Strings beginn with ks_ and are terminated by 0
 
 ; General OS strings
-ks_welcome: .byte "Booting Kernel for the Überquirrel Mark Zero",0
+ks_welcome: .byte "Booting Kernel for the Uberquirrel Mark Zero",0
 ks_author:  .byte "Scot W. Stevenson <scot.stevenson@gmail.com>",0
-ks_version: .byte "Kernel Version Alpha 004 (25. Feb 2014)",0
+ks_version: .byte "Kernel Version Alpha 004 (11. Feb 2015)",0
 
 ; =============================================================================
 ; END
