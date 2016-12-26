@@ -4,8 +4,10 @@ Scot W. Stevenson <scot.stevenson@gmail.com>
 First version 15. March 2014
 This version 26. Dec 2016
 
-## General words
+## Text interpreter
 
+From
+[https://www.complang.tuwien.ac.at/forth/gforth/Docs-html/The-Text-Interpreter.html](https://www.complang.tuwien.ac.at/forth/gforth/Docs-html/The-Text-Interpreter.html):
 ```
 : lat ." <foo>" ;
 : flat ." <bar>" >in dup @ 3 - swap ! ; \ flat prints "<bar><foo>"
@@ -34,7 +36,7 @@ Put IF in the loop:
 ```
 should produce "6 7 8 9 10"
 
-TEST nested loops (see https://www.forth.com/starting-forth/6-forth-do-loops/):
+Test nested loops [https://www.forth.com/starting-forth/6-forth-do-loops/](see https://www.forth.com/starting-forth/6-forth-do-loops/):
 ```
 : ddd cr 11 1 do
     11 1 do 
