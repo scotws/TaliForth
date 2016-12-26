@@ -7800,7 +7800,7 @@ strtbl: .word fs_title, fs_version, fs_disclaim, fs_typebye     ; 00-03
 ; ----------------------------------------------------------------------------- 
 ; General Forth Strings (all start with fs_)
 fs_title:      .byte "Tali Forth for the 65c02",0
-fs_version:    .byte "Version BETA (10. Feb 2015)",0
+fs_version:    .byte "Version BETA (26. Dec 2016)",0
 fs_disclaim:   .byte "Tali Forth comes with absolutely NO WARRANTY",0
 fs_typebye:    .byte "Type 'bye' to exit",0 
 fs_prompt:     .byte " ok",0
