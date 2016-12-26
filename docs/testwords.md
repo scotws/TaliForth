@@ -45,17 +45,24 @@ Test nested loops [https://www.forth.com/starting-forth/6-forth-do-loops/](see h
 ```
 should produce math table from 1x1 to 10x10
 
-Test UNLOOP and EXIT:
+Test EXIT:
 ```
-: eee 11 1 do i dup 8 = if drop unloop exit then . loop ." Done" ; 
+: eee1 true if exit then ." true" ; 
+: eee2 false if exit then ."false" ; 
 ```
-should produce "1 2 3 4 5 6 7"
+First word should just return with "ok", second word prints "false".
+
+Test UNLOOP: 
+```
+: fff 11 1 do i dup 8 = if drop unloop exit then . loop ." Done" ; 
+```
+should produce "1 2 3 4 5 6 7" (no "Done" printed)
 
 Test LEAVE
 ```
-: fff 11 1 do i dup 8 = if leave then . loop ." Done" drop ; 
+: ggg 11 1 do i dup 8 = if leave then . loop ." Done" drop ; 
 ```
-should produce "1 2 3 4 5 6 7 Done"
+should produce "1 2 3 4 5 6 7 Done" (note "Done" printed)
 
 The Data Stack should be empty after all of these words, check with .S
 

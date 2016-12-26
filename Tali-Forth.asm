@@ -6456,6 +6456,25 @@ a_unloop:       ; drop fudge number (limit/start) from DO/?DO off the
 
 z_unloop:       rts
 .scend
+
+
+; ----------------------------------------------------------------------------
+; EXIT ( -- )
+; Return control to the calling definition immediately. We have to get rid of all
+; the loop parameter stuff with UNLOOP if we do this; user must also have gotten
+; everything off the Return Stack put there.
+l_exit:         bra a_exit
+                .byte NC+CO+$04 
+                .word l_unloop    ; link to UNLOOP
+                .word z_exit
+                .byte "EXIT"
+
+.scope
+a_exit:         rts
+
+z_exit:         rts     ; dummy for compile only
+.scend
+
 ; ----------------------------------------------------------------------------
 ; J ( -- n ) (R: n -- n)
 ; Copy second loop counter from Return Stack to stack. Note we use a fudge
@@ -6466,7 +6485,7 @@ z_unloop:       rts
 ; TODO test this 
 l_j:            bra a_j
                 .byte NC+CO+$01 
-                .word l_unloop    ; link to UNLOOP
+                .word l_exit      ; link to EXIT
                 .word z_j
                 .byte "J"
 
