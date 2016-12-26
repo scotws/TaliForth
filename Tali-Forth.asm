@@ -2,7 +2,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  25. Dec 2015 (BETA)
+; This version  26. Dec 2015 (BETA)
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -6368,27 +6368,9 @@ a_ploop:        ; compile (+LOOP) -- don't call f_cmpljsr because this must
                 sta 2,x
                 jsr l_cmpc
 
-; HIER HIER 
                 ; complete compile of DO/?DO by replacing the six
                 ; dummy bytes by PHA instructions. The address where 
-                ; they are located is below the RTS on the Return 
-                ; Stack. This is a lot of work for something so little
-                ; and can probably be improved
-                ; ply             ; LSB
-                ; sty TMPCNT      ; not used as counter 
-                ; ply             ; MSB
-
-                ; pla             ; LSB of target address
-                ; sta TMPADR
-                ; pla             ; MSB
-                ; sta TMPADR+1
-
-                ; replace RTS address before something bad happens
-                ; phy             ; MSB
-                ; ldy TMPCNT
-                ; phy             ; LSB
-
-                ; TODO Take from Data Stack
+                ; they are located is on the Data Stack
                 lda 1,x
                 sta TMPADR
                 lda 2,x
@@ -6673,37 +6655,14 @@ a_do:           ; DO and ?DO share most of their code, use the FLAG2 to
                 ; determine which is which.
                 stz FLAG2       ; this is the original
 
-do_common:      ; we push HERE to the 65c02's stack so LOOP/+LOOP
-                ; knows where to compile the PHA instructions. We put this
-                ; on the Return Stack so we avoid getting mixed up in 
-                ; IF/THEN and other stuff that uses the Data Stack
-
-                ; but first we need to move the actual return address
-                ; for this routine out of the way
-                ply             ; LSB
-                sty TMPADR
-                ply             ; MSB
-
-; HIER HIER 
-                ; now we can save HERE 
-                ; TODO old version: Pushed to Return Stack
-                ; lda CP+1        ; MSB first
-                ; pha
-                ; lda CP
-                ; pha             ; then LSB
-                
-                ; TODO new version: Pushed to Data Stack
+do_common:      ; we push HERE to the Data Stack so LOOP/+LOOP
+                ; knows where to compile the PHA instructions. 
                 dex
                 dex
                 lda CP          ; LSB
                 sta 1,x
                 lda CP+1        ; MSB
                 sta 2,x
-
-                ; put RTS address back before something bad happens
-                phy             ; MSB
-                ldy TMPADR
-                phy             ; LSB
 
                 ; now we compile six dummy bytes that LOOP/+LOOP will
                 ; replace by the actual LDA/PHA instructions
