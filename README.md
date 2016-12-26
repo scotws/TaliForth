@@ -54,7 +54,7 @@ Code that works on Tali Forth should produce the same result in gforth or have a
 good reason why it is different. 
 
 
-## Assembly and Testing
+## Assembly
 
 Tali Forth was written with vim and the [Ophis 2.1
 cross-assembler](http://michaelcmartin.github.io/Ophis/). Ophis uses a slightly
@@ -97,6 +97,13 @@ Note that for testing and development, Tali Forth compiles to 16k and is
 installed starting $C000 instead of $E000. This is because py65mon hardcodes the
 input and output routines at the beginning of $F000 and I'm too lazy to modify
 them (at the moment). 
+
+
+## Testing
+
+There is no automatic or formal test suite available at this time. The file
+docs/testwords.md includes a list of words that will help with some general
+cases.
 
 
 ## Notes for Developers 
