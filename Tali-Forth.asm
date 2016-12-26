@@ -2,7 +2,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  10. Feb 2015 (first BETA)
+; This version  25. Dec 2015 (BETA)
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -6368,24 +6368,33 @@ a_ploop:        ; compile (+LOOP) -- don't call f_cmpljsr because this must
                 sta 2,x
                 jsr l_cmpc
 
+; HIER HIER 
                 ; complete compile of DO/?DO by replacing the six
                 ; dummy bytes by PHA instructions. The address where 
                 ; they are located is below the RTS on the Return 
                 ; Stack. This is a lot of work for something so little
                 ; and can probably be improved
-                ply             ; LSB
-                sty TMPCNT      ; not used as counter 
-                ply             ; MSB
+                ; ply             ; LSB
+                ; sty TMPCNT      ; not used as counter 
+                ; ply             ; MSB
 
-                pla             ; LSB of target address
-                sta TMPADR
-                pla             ; MSB
-                sta TMPADR+1
+                ; pla             ; LSB of target address
+                ; sta TMPADR
+                ; pla             ; MSB
+                ; sta TMPADR+1
 
                 ; replace RTS address before something bad happens
-                phy             ; MSB
-                ldy TMPCNT
-                phy             ; LSB
+                ; phy             ; MSB
+                ; ldy TMPCNT
+                ; phy             ; LSB
+
+                ; TODO Take from Data Stack
+                lda 1,x
+                sta TMPADR
+                lda 2,x
+                sta TMPADR+1
+                inx
+                inx
 
                 ; because of the way that RTS works we don't need to 
                 ; save CP, but CP-1
@@ -6675,11 +6684,21 @@ do_common:      ; we push HERE to the 65c02's stack so LOOP/+LOOP
                 sty TMPADR
                 ply             ; MSB
 
+; HIER HIER 
                 ; now we can save HERE 
-                lda CP+1        ; MSB first
-                pha
-                lda CP
-                pha             ; then LSB
+                ; TODO old version: Pushed to Return Stack
+                ; lda CP+1        ; MSB first
+                ; pha
+                ; lda CP
+                ; pha             ; then LSB
+                
+                ; TODO new version: Pushed to Data Stack
+                dex
+                dex
+                lda CP          ; LSB
+                sta 1,x
+                lda CP+1        ; MSB
+                sta 2,x
 
                 ; put RTS address back before something bad happens
                 phy             ; MSB
