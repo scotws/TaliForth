@@ -1,6 +1,6 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 10. Feb 2015
+This version: 29. Dec 2016
 
 As of Feb 10, 2015 Tali Forth is in BETA status. This means the code has entered a "feature freeze" (ie no new words) with the aim of finding bugs and opitimizing the code. Optimization areas include: 
 
@@ -11,6 +11,17 @@ As of Feb 10, 2015 Tali Forth is in BETA status. This means the code has entered
 - consider subroutine to compile JSR/JMP with stuff from stack
 
 Apart from that, we should look into a formal testing suit for Forth.
+
+
+=== MAJOR REWRITE === 
+
+There will probably be a major rewrite of Tali Forth in the future, since I've learned so much more by now. Possible changes:
+
+- Keeping header and code parts of the dictionary separate, to get rid of the BRA instruction at the beginning of every entry and to be able to have the words reuse code
+- Use a pre-built board from WDC as a reference design
+- Consider multitasking
+
+There is no date for a rewrite except for "after Liara Forth is done" (https://github.com/scotws/LiaraForth)
 
 
 === SUGGESTIONS FOR ADDITIONAL FEATURES === 
