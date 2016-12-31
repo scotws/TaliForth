@@ -1467,7 +1467,7 @@ _nochrs:        ; Only spaces found. Return beginning of CIB
                 dex
                 dex 
 
-                ; return end of line as address 
+                ; return head of CIB as address 
                 lda CIBA
                 sta 1,x
                 lda CIBA+1
