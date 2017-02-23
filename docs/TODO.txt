@@ -1,10 +1,6 @@
 TODO for Tali Forth for the 65c02 Project
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 21. Feb 2017
-
-- Check if DOVAR needlessly uses temporary storage
-- Check if f_postpo_int is ever used at all
-- Code D>S so it respects the sign
+This version: 23. Feb 2017
 
 As of Feb 10, 2015 Tali Forth is in BETA status. This means the code has entered a "feature freeze" (ie no new words) with the aim of finding bugs and opitimizing the code. Optimization areas include: 
 
@@ -26,6 +22,13 @@ There will probably be a major rewrite of Tali Forth in the future, since I've l
 - Consider multitasking
 
 There is no date for a rewrite except for "after Liara Forth is done" (https://github.com/scotws/LiaraForth)
+
+DETAILS
+
+- Check if DOVAR needlessly uses temporary storage
+- Check if f_postpo_int is ever used at all
+- Code D>S so it respects the sign
+- Convert all to lower-case
 
 
 === SUGGESTIONS FOR ADDITIONAL FEATURES === 
