@@ -1,3 +1,32 @@
+# Manual for Tali Forth for the 65c02 
+Scot W. Stevenson <scot.stevenson@gmail.com> 
+
+(THIS TEXT IS UNDER DEVELOPMENT AND MERELY A COLLECTION OF NOTES)
+
+## Overview
+
+
+## Installation
+
+
+### Running the provided binary
+
+Tali comes with an assembled version that should run out of the box with the
+[py65mon](https://github.com/mnaberez/py65) simulator, a Python program. In this
+version, Tali is compiled to 16k and starts at $C000. Note that py65mon
+hardcodes the input and output routines at the beginning of $F000. To install
+py65mon with Linux, use ``` sudo pip install -U py65 ```
+
+(If you don't have PIP installed, you will have to add it first with
+```
+sudo apt-get install python-pip
+```
+There is a setup.py script as part of the package, too.) To start the emulator,
+run:
+```
+py65mon --mpu 65C02 -r ophis.bin
+```
+
 ## Assembly
 
 Tali Forth was written with vim and the [Ophis 2.1
@@ -61,7 +90,9 @@ system. Please note:
   be expected to survive subroutines unchanged.
 
 
-## Why "Tali" Forth?
+## Frequently Asked Questions
+
+### Why "Tali" Forth?
 
 I like the name, and we're probably not going to have anymore kids I can give it
 to.
