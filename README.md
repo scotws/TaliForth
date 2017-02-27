@@ -1,8 +1,10 @@
 # Tali Forth for the 65c02 
 Scot W. Stevenson <scot.stevenson@gmail.com> 
 First version: 19. Jan 2014 
-This version: 26. Feb 2017 
+This version: 27. Feb 2017 
 
+(THIS VERSION OF TALI IS BEING COMPLETELY REWRITTEN, THE CODE CURRENTLY WON'T
+EVEN ASSEMBLE. COME BACK LATER!)
 
 ## Dude, I am the very model of a Salarian scientist, let me just start!
 
