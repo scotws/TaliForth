@@ -15,7 +15,7 @@ Tali comes with an assembled version that should run out of the box with the
 [py65mon](https://github.com/mnaberez/py65) simulator, a Python program. In this
 version, Tali is compiled to 16k and starts at $C000. Note that py65mon
 hardcodes the input and output routines at the beginning of $F000. To install
-py65mon with Linux, use ``` sudo pip install -U py65 ```
+py65mon with Linux, use `sudo pip install -U py65`
 
 (If you don't have PIP installed, you will have to add it first with
 ```
@@ -44,7 +44,7 @@ sudo python setup.py install
 Switch to the folder where the Tali code lives, and assemble with
 
 ```
-ophis --65c02 Tali-main-B001.asm
+ophis --65c02 taliforth.asm
 ```
 
 Development was performed with [py65mon](https://github.com/mnaberez/py65) which
@@ -67,9 +67,8 @@ py65mon --mpu 65C02 -r ophis.bin
 ```
 
 Note that for testing and development, Tali Forth compiles to 16k and is
-installed starting $C000 instead of $E000. This is because py65mon hardcodes the
-input and output routines at the beginning of $F000 and I'm too lazy to modify
-them (at the moment).
+installed starting $C000. This is because py65mon hardcodes the input and output
+routines at the beginning of $F000.
 
 
 ## Testing
@@ -101,4 +100,8 @@ to.
 Normandy, a character in the "Mass Effect" universe created by EA / BioWare.
 This software has absolutely nothing to do with either the game or the companies
 and neither do I, expect that I've played the games and enjoyed them.)
+
+### Then who is "Liara"?
+
+Liara Forth is a STC Forth for the big sibling of the 6502, the 65816. 
 

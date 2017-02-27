@@ -1,39 +1,55 @@
-TODO for Tali Forth for the 65c02 Project
+Roadmap for Tali Forth for the 65c02 
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 23. Feb 2017
-
-As of Feb 10, 2015 Tali Forth is in BETA status. This means the code has entered a "feature freeze" (ie no new words) with the aim of finding bugs and opitimizing the code. Optimization areas include: 
-
-- simplify high-level word definitions
-- see if we can do without the various "(..)" helper functions of words
-- check code for use of BIT 
-- unroll macros for better readability of text
-- consider subroutine to compile JSR/JMP with stuff from stack
-
-Apart from that, we should look into a formal testing suit for Forth.
-
+This version: 26. Feb 2017
 
 === MAJOR REWRITE === 
 
-There will probably be a major rewrite of Tali Forth in the future, since I've learned so much more by now. Possible changes:
+Tali Forth is currently undergoing a major rewrite. The aim is to incorporate what 
+was learned since the first major version and to synchronize the development with 
+Liara Forth (https://github.com/scotws/LiaraForth). 
 
-- Keeping header and code parts of the dictionary separate, to get rid of the BRA instruction at the beginning of every entry and to be able to have the words reuse code
-- Use a pre-built board from WDC as a reference design
-- Consider multitasking
 
-There is no date for a rewrite except for "after Liara Forth is done" (https://github.com/scotws/LiaraForth)
+MAJOR POINTS
+
+- Split the Dictionary headers from the code
+- Convert everything to lower-case
+
 
 DETAILS
 
 - Check if DOVAR needlessly uses temporary storage
 - Check if f_postpo_int is ever used at all
 - Code D>S so it respects the sign
-- Convert all to lower-case
 
 
-=== SUGGESTIONS FOR ADDITIONAL FEATURES === 
+=== HISTORY ===
 
-These will be considered once Tali Forth has reached its first full release, not before
+Add changes to top with date. Note these are only major milestones and versions.
 
-- add CASE, TIME&DATE, THROW/CATCH
-- warn when we redefine a word already in the dictionary
+23. Feb 2017: Start of major rewrite, synchronizing with Liara Forth 
+
+10. Feb 2015: Added RECURSE. Tali now "feature complete", entering BETA
+09. Feb 2015: Added new and working versions of DO/?DO/LEAVE/LOOP/+LOOP
+28. Jan 2015: Added LEAVE, rewrote THEN, LOOP, +LOOP and DO
+25. Jan 2015: Added WORD (against better judgement); MOVE; 2R group of words 
+20. Jan 2015: Added ABORT", complete rewrite of S"
+19. Jan 2015: Added f_cmpljsr and friends, converted code to their use
+17. Jan 2015: Added DEFER, DEFER!, DEFER@, IS, ACTION-OF; >BODY now works
+14. Jan 2015: Major rewrite of CREATE, DOVAR, DOES; adds DODOES
+11. Jan 2015: Added ['], internal routine for POSTPONE (l_postpoint)
+10. Jan 2015: Added PICK, VALUE and TO
+
+11. Nov 2014: Added ANSI-standard +LOOP
+09. Nov 2014: LOOP, DO, I and J now confirm to ANSI standard
+02. Nov 2014: Expanded README.txt, CR now newline, adapted to new py65
+16. May 2014: CREATE/DOES> working 
+13. Apr 2014: Basic DO/LOOP works (ALPHA 002) 
+07. Apr 2014: Published as ALPHA 001 to 6502.org
+03. Apr 2014: IF ELSE THEN works 
+26. Feb 2014: Native compiling works
+20. Feb 2014: Basic BEGIN-AGAIN loop works
+15. Feb 2014: Basic compiling function up and running 
+06. Feb 2014: Design of Dictionary structure complete
+01. Feb 2014: Primitive interpreter loop up and running
+19. Jan 2014: Start of project
+
