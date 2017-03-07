@@ -1,7 +1,7 @@
 # Tali Forth for the 65c02 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 19. Jan 2014 
-This version:  26. Dec 2016
+This version:  07. Mar 2017
 
 This is the README.txt version released with Tali Forth BETA 001. Note that this
 is a BETA release of an incomplete program. See the .ods spreadsheet for a list
@@ -105,6 +105,18 @@ There is no automatic or formal test suite available at this time. The file
 docs/testwords.md includes a list of words that will help with some general
 cases.
 
+## Gotchas
+
+Tali has a 16-bit cell size (use `1 cells 8 * .` to get the cells size in bits
+with any Forth), which can trip up calculations when compared to the _de facto_
+standard Gforth with 64 bits. Take this example:
+```
+( Gforth ) DECIMAL 1000 100 UM* HEX SWAP U. U.  186A0 0  OK
+( Tali )   DECIMAL 1000 100 UM* HEX SWAP U. U.  86A0 1  OK
+```
+Tali has to use the upper cell of a double-celled number to correctly report the
+result, while Gforth doesn't. If the conversion from double to single is only
+via a DROP instruction, this will produce different results.
 
 ## Notes for Developers 
 
