@@ -70,6 +70,19 @@ Note that for testing and development, Tali Forth compiles to 16k and is
 installed starting $C000. This is because py65mon hardcodes the input and output
 routines at the beginning of $F000.
 
+## Gotchas
+
+Tali has a 16-bit cell size (use `1 cells 8 * .` to get the cells size in bits
+with any Forth), which can trip up calculations when compared to the _de facto_
+standard Gforth with 64 bits. Take this example:
+```
+( Gforth ) DECIMAL 1000 100 UM* HEX SWAP U. U.  186A0 0  OK
+( Tali )   DECIMAL 1000 100 UM* HEX SWAP U. U.  86A0 1  OK
+```
+Tali has to use the upper cell of a double-celled number to correctly report the
+result, while Gforth doesn't. If the conversion from double to single is only
+via a DROP instruction, this will produce different results.
+
 
 ## Testing
 

@@ -2,7 +2,7 @@
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ;
 ; First version 19. Jan 2014
-; This version  26. Feb 2017 (BETA)
+; This version  07. Mar 2017
 ; -----------------------------------------------------------------------------
 
 ; This program is placed in the public domain. 
@@ -5363,7 +5363,7 @@ l_stod:         bra a_stod
 a_stod:         dex
                 dex
 
-                lda 3,x         ; MSB of low byte
+                lda 4,x         ; LSB of low byte
                 bpl _pos 
 
                 lda #$FF        ; extend negative sign
