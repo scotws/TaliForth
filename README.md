@@ -71,7 +71,7 @@ sudo python setup.py install
 Switch to the folder where the Tali code lives, and assemble with
 
 ```
-ophis --65c02 Tali-main-B001.asm 
+ophis --65c02 Tali-Main-B001.asm 
 ```
 
 Development was performed with [py65mon](https://github.com/mnaberez/py65) which

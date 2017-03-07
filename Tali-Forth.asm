@@ -5363,7 +5363,7 @@ l_stod:         bra a_stod
 a_stod:         dex
                 dex
 
-                lda 3,x         ; MSB of low byte
+                lda 4,x         ; MSB of high byte
                 bpl _pos 
 
                 lda #$FF        ; extend negative sign
