@@ -1,6 +1,6 @@
 Roadmap for Tali Forth for the 65c02 
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 26. Feb 2017
+This version: 01. March 2017
 
 === MAJOR REWRITE === 
 
@@ -20,6 +20,8 @@ DETAILS
 - Check if DOVAR needlessly uses temporary storage
 - Check if f_postpo_int is ever used at all
 - Code D>S so it respects the sign
+- Remove TOUPPER
+- >NAME becomes INT>NAME as in Liara Forth
 
 
 === HISTORY ===
