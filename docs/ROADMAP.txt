@@ -1,6 +1,6 @@
 Roadmap for Tali Forth for the 65c02 
 Scot W. Stevenson <scot.stevenson@gmail.com>
-This version: 01. March 2017
+This version: 13. September 2017
 
 === MAJOR REWRITE === 
 
@@ -13,6 +13,7 @@ MAJOR POINTS
 
 - Split the Dictionary headers from the code
 - Convert everything to lower-case
+- Multi-List dictionary links for speed
 
 
 DETAILS

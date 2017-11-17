@@ -1,8 +1,61 @@
-Header Structure for the Dictionary
-of Tali Forth for the 65c02
+# Dictionary Structure for Tali Forth for the 65c02
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 19. Jan 2014
-This version:  16. Jan 2015
+This version: 13. September 2017
+
+THIS DOCUMENT IS BEING COMPLETELY REWRITTEN AND CURRENTLY INCOMPLETE
+
+
+## Overview
+
+Tali Forth follows the traditional model of a Forth dictionary - a linked list
+of words terminated with a zero pointer - with two twists:
+
+1. Headers and code are separate to enable various tricks in the code
+2. Multiple lists instead of one list for speed 
+
+
+## Header and code
+
+Each word has a "name token" (nt, ``nt_word`` in the code) that points to the
+first byte of the header, and an "execution token" (xt, ``xt_word``) that points
+to the start of the code. There is a third pointer that references the byte
+_after_ the end of the code (``z_word``) to enable native compilation of the
+word if allowed.
+
+Note that in constrast to most Forths, the length of the word is not contained
+in the Dictionary at all. This is because we use multiple lists depending on the
+word lenght.
+
+## Linked Lists
+
+http://forum.6502.org/viewtopic.php?f=9&t=4903
+
+HIER HIER HIER 
+
+(Do we need len of word in the header at all?)
+
+## 
+
+
+Each header consists of one byte for the length of the word's string, a status
+byte (see below), a link to the next word in the Dictionary (``0000`` marks its
+end), the pointer to the beginning of the code (``xt_word``), the pointer to the
+end of the code (``z_word``), and then the word's name string in plain ASCII,
+without any terminating space or zero.
+
+The Dictionary consists of hard-coded routines in assembly and Forth-coded words
+that are generated when the system starts up (or after the COLD word). The first
+hard-coded word is always DROP, the last one always BYE (use WORDS to get a
+complete list and WORDS&SIZES for a list with the size of the code). Any word
+that appears before DROP was automatically generated at boot from the Forth cod>
+
+(During development, a large number of words were first included as high-level
+Forth code or simple series of subroutine jumps, and then later optimized in
+native code. The aim was to get the system up and running first.)
+
+
+
 
 This document describes the structure of the Tali Forth dictionary entries. The design stresses simple design and execution speed at the cost of size. 
 

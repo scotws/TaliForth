@@ -1,4 +1,4 @@
-# Strack Structure of Tali Forth for the 65c02
+# Stack Structure of Tali Forth for the 65c02
 Scot W. Stevenson <scot.stevenson@gmail.com> 
 First version: 19. Jan 2014 
 This version:  27. Feb 2017 
@@ -17,10 +17,11 @@ is `dsp0` in the code.
 
 **Single cell values:** Since the cell size is 16 bits, each stack entry
 consists of two bytes. They are stored little endian (least significant byte
-first). Therefore, the DSP points to the LSB of the current TOS. 
+first). Therefore, the DSP points to the LSB of the current TOS. (Try reading
+that last sentence to a friend. Aren't abbreviations fun?)
 
-Because the DSP points to the current top of the stack, the byte it points to at
-the beginning as DSP0 will never be accessed: The DSP is decremented first with
+Because the DSP points to the current top of the stack, the byte it points to
+after boot - `DSP0` - will never be accessed: The DSP is decremented first with
 two `dex` instructions, and then the new value placed on the stack. Therefore,
 the initial byte is garbage and can be considered part of the floodplain. 
 ```
@@ -47,11 +48,11 @@ the initial byte is garbage and can be considered part of the floodplain.
 _Snapshot of the Data Stack with one entry as Top of the Stack (TOS). The DSP
 has been increased by one and the value written._
 
-Note that the system (65c02) stack - useds as the Return Stack (RS) by Tali -
+Note that the system (65c02) stack - used as the Return Stack (RS) by Tali -
 pushes the MSB on first and then the LSB (preserving little endian), so the
 basic structure is the same for both stacks. 
 
-This structure puts the second entry on the stack ("next on stack", NOS) at
+Because of this stack design, the second entry ("next on stack", NOS) starts at
 `02,X` and the third entry ("third on stack", 3OS) at `04,X`. 
 
 **Double cell values:** The double cell is stored on top of the single cell.
