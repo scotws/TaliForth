@@ -1,11 +1,11 @@
-# Tali Forth for the 65c02 
-Scot W. Stevenson <scot.stevenson@gmail.com> 
-First version: 19. Jan 2014  
-This version:  07. Mar 2018 
+# Tali Forth for the 65c02  
+Scot W. Stevenson <scot.stevenson@gmail.com>   
+First version: 19. Jan 2014   
+This version:  07. Mar 2018  
 
 **Note: This version of Tali Forth will be phased out in the near future for
 Tali Forth 2, a complete rewrite which can be found at
-[https://github.com/scotws/TaliForth2](https://github.com/scotws/TaliForth2).***
+[https://github.com/scotws/TaliForth2](https://github.com/scotws/TaliForth2).**
 
 This is the README.txt version released with Tali Forth BETA 001. Note that this
 is a BETA release of an incomplete program. See the .ods spreadsheet for a list
