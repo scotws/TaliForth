@@ -3,8 +3,8 @@ Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 19. Jan 2014   
 This version:  07. Mar 2018  
 
-**Note: This version of Tali Forth will be phased out in the near future for
-Tali Forth 2, a complete rewrite which can be found at
+**This version of Tali Forth is outdated and has been frozen. It has been
+replaced by Tali Forth 2, a complete rewrite which can be found at
 [https://github.com/scotws/TaliForth2](https://github.com/scotws/TaliForth2).**
 
 This is the README.txt version released with Tali Forth BETA 001. Note that this
